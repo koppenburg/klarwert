@@ -1,0 +1,15 @@
+Musterversicherung AG
+Standmitteilung zu Ihrer fondsgebundenen Rentenversicherung
+
+Versicherungsnehmerin: Sabine Probst
+Anschrift: Am Markt 12, 66679 Losheim am See
+Vertragsnummer: MV-2018-998877
+E-Mail: sabine.probst@example.org
+
+Tarif: MusterRente Invest (MRI), Tarifgeneration 2018
+Stichtag: 01.10.2026
+Vertragsguthaben: 21.315,80 €
+Rückkaufswert: 20.676,33 €
+Garantierter Rentenfaktor: 24,00 € je 10.000 € Kapital
+
+Diese Mitteilung wurde maschinell erstellt.

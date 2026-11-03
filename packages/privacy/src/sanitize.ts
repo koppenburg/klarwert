@@ -37,7 +37,7 @@ function decodeText(data: Uint8Array): string {
   } catch {
     text = new TextDecoder("windows-1252").decode(data);
   }
-  return text.replace(/^﻿/, "").replace(/\r\n?/g, "\n");
+  return text.replace(/^\uFEFF/, "").replace(/\r\n?/g, "\n");
 }
 
 /** Dateiname bereinigen (z. B. „Police_Erika_Mustermann.pdf"). */

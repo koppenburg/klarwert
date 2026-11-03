@@ -143,3 +143,11 @@ describe("Sensitivität", () => {
     expect(high?.endCapital.A ?? 0).toBeGreaterThan(low?.endCapital.A ?? Infinity);
   });
 });
+
+describe("Wechsel am Stichtag ohne Vorlauf", () => {
+  it("Angebot/Neuvertrag mit Guthaben 0 und Stichtag = Beginn: Szenarien rechenbar", () => {
+    const fresh: ContractState = { ...contract, layer: "layer3", startYear: 2027, elapsedMonths: 0, currentValue: 0 };
+    const res = runUnsubsidisedScenarios(fresh, { ...assumptions, person: { children: [], eligible: false } });
+    expect(byId(res, "L3_SURRENDER_DEPOT").endCapital).toBeCloseTo(100 * 360, 2);
+  });
+});

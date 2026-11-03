@@ -3,7 +3,9 @@
   "private": true,
   "type": "module",
   "packageManager": "pnpm@10.28.0",
-  "engines": { "node": ">=22" },
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
     "dev": "pnpm --filter @klarwert/web dev",
     "build": "pnpm --filter @klarwert/web build",
@@ -11,16 +13,24 @@
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "typecheck": "pnpm -r --parallel typecheck",
-    "lint": "eslint .",
-    "check": "pnpm typecheck && pnpm lint && pnpm test"
+    "lint": "eslint . && pnpm --filter @klarwert/web lint",
+    "check": "pnpm typecheck && pnpm lint && pnpm test",
+    "fixtures:synthetic": "tsx tests/fixtures/synthetic/generate.ts"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.0",
+    "@napi-rs/canvas": "^1.1.0",
     "@types/node": "^22.19.0",
     "@vitest/coverage-v8": "^5.1.0",
     "eslint": "^9.39.0",
+    "pdf-lib": "^1.17.1",
+    "tsx": "^4.23.15",
     "typescript": "~6.0.3",
     "typescript-eslint": "^8.72.1",
-    "vitest": "^5.1.0"
+    "vitest": "^5.1.0",
+    "@klarwert/calc": "workspace:*",
+    "@klarwert/extraction": "workspace:*",
+    "@klarwert/privacy": "workspace:*",
+    "@klarwert/legal-config": "workspace:*"
   }
 }

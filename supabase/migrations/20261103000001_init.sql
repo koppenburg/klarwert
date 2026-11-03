@@ -2,6 +2,7 @@
 -- Datenschutz: Es werden nur Tarif- und Vertragsparameter unter einer internen Fallnummer gespeichert.
 -- Der Kundenname ist ein freiwilliges Feld (cases.customer_name) und verlässt Supabase nie in Richtung Modell-API.
 
+-- (pg_trgm in 0002 wieder entfernt)
 create extension if not exists pg_trgm;
 
 -- Team -----------------------------------------------------------------------

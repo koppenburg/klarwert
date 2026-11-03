@@ -113,7 +113,7 @@ async function extractText(page: PDFPageProxy): Promise<string> {
         s += it.str;
         prev = it;
       }
-      return s.replace(/[  ]+$/g, "");
+      return s.replace(/[ \u00a0]+$/g, "");
     })
     .join("\n");
 }
@@ -141,6 +141,7 @@ async function renderPage(page: PDFPageProxy, dpi: number, maxSide: number): Pro
 export function isUsableTextLayer(text: string): boolean {
   const meaningful = text.replace(/[^\p{L}\p{N}]/gu, "").length;
   if (meaningful < 25) return false;
+  // eslint-disable-next-line no-control-regex -- Steuerzeichen deuten auf kaputte Zeichenkodierung hin
   const broken = (text.match(/[�\p{Co}\u0000-\u0008\u000B\u000C\u000E-\u001F]/gu) ?? []).length;
   return broken / Math.max(1, text.length) < 0.05;
 }

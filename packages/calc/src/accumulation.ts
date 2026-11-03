@@ -343,7 +343,8 @@ export class CalcInputError extends Error {}
 
 export function validateInput(input: SimulationInput): void {
   const errors: string[] = [];
-  if (!Number.isInteger(input.termMonths) || input.termMonths <= 0) errors.push("Ansparphase (termMonths) muss eine positive ganze Zahl sein");
+  // termMonths = 0 nur als leere Fortschreibung (Wechsel am Stichtag) zulässig
+  if (!Number.isInteger(input.termMonths) || input.termMonths < 0 || (input.termMonths === 0 && input.start?.month !== 0)) errors.push("Ansparphase (termMonths) muss eine positive ganze Zahl sein");
   if (!Number.isFinite(input.grossReturnPercent) || input.grossReturnPercent <= -100) errors.push("Bruttorendite ungültig");
   const p = input.contributions;
   if (p.amount < 0) errors.push("Beitrag darf nicht negativ sein");

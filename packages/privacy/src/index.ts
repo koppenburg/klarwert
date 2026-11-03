@@ -9,3 +9,4 @@ export type { Box, DetectOptions, PiiKind, PiiMatch, SanitizedDocument, Sanitize
 export { detectPii, maskText, PLACEHOLDERS } from "./detect";
 export { sanitizeDocument, verifySanitized, applyBoxes } from "./sanitize";
 export { terminateOcr } from "./ocr";
+export { extractPdfText } from "./pdf-text";

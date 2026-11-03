@@ -1,0 +1,23 @@
+{
+  "name": "@klarwert/privacy",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "PII-Erkennung, lokale OCR (Tesseract), Schwärzung von Bildern und Maskierung von Text vor jedem Modellaufruf.",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@napi-rs/canvas": "^1.1.0",
+    "@tesseract.js-data/deu": "^1.0.0",
+    "pdfjs-dist": "^6.5.438",
+    "sharp": "^0.35.5",
+    "tesseract.js": "^7.0.0"
+  },
+  "devDependencies": {
+    "pdf-lib": "^1.17.1"
+  }
+}

@@ -1,0 +1,9 @@
+{
+  "name": "@klarwert/legal-config",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Gesetzliche Konstanten mit Quelle, Datum und Prüfstatus.",
+  "exports": { ".": "./src/index.ts" },
+  "scripts": { "typecheck": "tsc -p tsconfig.json" }
+}

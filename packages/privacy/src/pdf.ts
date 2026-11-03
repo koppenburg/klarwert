@@ -1,4 +1,4 @@
-import { createRequire } from "node:module";
+import { packageDir } from "./resolve";
 import path from "node:path";
 import type { PDFPageProxy } from "pdfjs-dist/legacy/build/pdf.mjs";
 
@@ -18,8 +18,7 @@ function loadPdfJs(): Promise<PdfJs> {
 }
 
 function pdfjsDir(): string {
-  const require = createRequire(import.meta.url);
-  return path.dirname(require.resolve("pdfjs-dist/package.json"));
+  return packageDir("pdfjs-dist");
 }
 
 export interface PdfPageInfo {

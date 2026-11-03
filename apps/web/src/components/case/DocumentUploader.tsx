@@ -58,6 +58,7 @@ export function DocumentUploader({ caseId }: { caseId: string }) {
       setError(e instanceof Error ? e.message : "Fehler beim Upload");
     } finally {
       setBusy(false);
+      router.refresh();
     }
   }
 

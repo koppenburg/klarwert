@@ -70,7 +70,7 @@ export default async function ReportPage({ params, searchParams }: { params: Pro
 
   return (
     <main className="mx-auto max-w-[190mm] bg-white px-2 py-4 text-[#1d2330] print:max-w-none print:p-0">
-      <style>{`@page { size: A4; margin: 16mm 14mm 18mm 14mm; } body { background: #fff; } .break-before-page { break-before: page; } table, figure { break-inside: avoid; }`}</style>
+      <style>{`@page { size: A4; margin: 16mm 14mm 18mm 14mm; } body { background: #fff; } .break-before-page { break-before: page; } figure { break-inside: avoid; } tr { break-inside: avoid; } h2, h3, h4 { break-after: avoid-page; } table { font-size: 11px; } th, td { padding-left: 6px !important; padding-right: 6px !important; }`}</style>
       <header className="mb-6 flex items-start justify-between border-b pb-4" style={{ borderColor: branding.colors.primary }}>
         <div>
           <p className="text-[11px] uppercase tracking-wider text-[#5b6475]">Klarwert-Analyse</p>

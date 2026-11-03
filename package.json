@@ -12,25 +12,28 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
-    "typecheck": "pnpm -r --parallel typecheck",
+    "typecheck": "pnpm -r --parallel typecheck && tsc -p tsconfig.json",
     "lint": "eslint . && pnpm --filter @klarwert/web lint",
     "check": "pnpm typecheck && pnpm lint && pnpm test",
-    "fixtures:synthetic": "tsx tests/fixtures/synthetic/generate.ts"
+    "fixtures:synthetic": "tsx tests/fixtures/synthetic/generate.ts",
+    "e2e:acceptance": "tsx tests/e2e/acceptance.ts"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.0",
+    "@klarwert/calc": "workspace:*",
+    "@klarwert/extraction": "workspace:*",
+    "@klarwert/legal-config": "workspace:*",
+    "@klarwert/privacy": "workspace:*",
     "@napi-rs/canvas": "^1.1.0",
+    "@supabase/supabase-js": "^2.118.0",
     "@types/node": "^22.19.0",
     "@vitest/coverage-v8": "^5.1.0",
     "eslint": "^9.39.0",
     "pdf-lib": "^1.17.1",
+    "playwright-core": "1.64.1",
     "tsx": "^4.23.15",
     "typescript": "~6.0.3",
     "typescript-eslint": "^8.72.1",
-    "vitest": "^5.1.0",
-    "@klarwert/calc": "workspace:*",
-    "@klarwert/extraction": "workspace:*",
-    "@klarwert/privacy": "workspace:*",
-    "@klarwert/legal-config": "workspace:*"
+    "vitest": "^5.1.0"
   }
 }

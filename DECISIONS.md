@@ -1,0 +1,100 @@
+# DECISIONS.md – Entscheidungen und Annahmen
+
+Jede Entscheidung ist umkehrbar, sofern nicht anders vermerkt. Format: Datum · Entscheidung · Begründung · Alternativen.
+
+## Infrastruktur
+
+**2026-11-03 · Supabase-Projekt `klarwert` in eu-central-1 (Frankfurt), Organisation „Dominic“ (Pro).**
+Die Region ist vorgegeben. Die Kostenbestätigung lief über den Supabase-Dialog.
+
+**2026-11-03 · Kein Service-Role-Schlüssel in der App.**
+Alle Server-Zugriffe laufen mit der Sitzung des angemeldeten Beraters (RLS `is_team_member()`). Das macht die Angriffsfläche kleiner, und in Vercel liegt kein Schlüssel mit Vollzugriff.
+
+**2026-11-03 · Teamzugang über `team_members` + Auto-Mitgliedschaft für bestätigte @koppenburg.info-Konten.**
+Ein angemeldetes, aber nicht freigeschaltetes Konto sieht nichts. Domain in `team_settings`. Empfehlung: Self-Signup in Supabase deaktivieren.
+
+**2026-11-03 · Upload direkt vom Browser in Supabase Storage.**
+Vercel begrenzt Request-Bodies auf 4,5 MB, Policen und AVB sind oft größer. Der Server lädt das Original anschließend für die Bereinigung.
+
+**2026-11-03 · Region `fra1` für Vercel-Funktionen** (`apps/web/vercel.json`): kurze Wege zu Supabase Frankfurt.
+
+**2026-11-03 · PDF-Erzeugung mit `playwright-core` + `@sparticuz/chromium` auf Vercel**, lokal mit vorhandenem Chromium.
+Der Headless-Browser lädt die echte Report-Seite und bekommt dafür die Sitzungs-Cookies der Anfrage.
+
+**2026-11-03 · TypeScript 6.0 statt 7.0.**
+typescript-eslint 8.72 unterstützt TS < 6.1. Next.js 16.4.5 ist kompatibel.
+
+## Datenschutz
+
+**2026-11-03 · Fünftes Paket `packages/privacy`** zusätzlich zu den vorgegebenen vier.
+OCR, Bildbearbeitung und PDF-Rendering sind schwere Laufzeitabhängigkeiten und gehören nicht in die Schemas/Prompts von `extraction`. Den Paketgrenzen der Vorgabe widerspricht das nicht.
+
+**2026-11-03 · Tesseract als tesseract.js (WASM) mit gebündelten deutschen Sprachdaten.**
+Vercel bietet kein System-Tesseract. Zur Laufzeit gibt es keinen Download (CDN).
+
+**2026-11-03 · PDFs mit Textlayer: Klarwert übermittelt nur den maskierten Text, kein Seitenbild.**
+Ein Seitenbild ohne Schwärzung wäre ein PII-Risiko. Für Scan-Seiten rendert Klarwert die Seite, liest sie per OCR und schickt das geschwärzte Bild. Bilder auf Textlayer-Seiten werden nicht übermittelt; das Tool gibt dazu eine Warnung aus.
+
+**2026-11-03 · Menschliche Freigabe der bereinigten Fassung vor jedem Modellaufruf, dazu automatische Zweitprüfung (Re-OCR) unmittelbar vor dem Aufruf.**
+Die Erkennung arbeitet regelbasiert und ist nicht vollständig. Vorschau und manuelles Nachschwärzen schließen die Lücke.
+
+**2026-11-03 · Gefundene PII-Werte werden nicht gespeichert, nur ihre Anzahl je Art.**
+
+**2026-11-03 · Fondskosten aus der Fondsauswahl** (gewichtete TER) berechnet der Server deterministisch und legt sie als vertragsindividuellen *Vorschlag* an, nicht das Modell. Bestätigen muss sie der Berater.
+
+## Fachlogik
+
+**2026-11-03 · Gesetzliche Konstanten an Primärquellen verifiziert** (BGBl. 2026 I Nr. 156, BT-Drs. 21/4088 und 21/4996, gesetze-im-internet.de).
+Folgende Werte weichen von den Annahmen im Auftrag ab:
+- Kinderzulage neu: **100 % der Beiträge, max. 300 € je Kind** (1:1). Der Auftrag nannte nur „bis 300 €“.
+- Kostendeckel Standarddepot: **1,0 %** (RegE: 1,5 %).
+- Mindesteigenbeitrag neu: **120 €** als Alles-oder-nichts-Schwelle, keine anteilige Kürzung.
+- Abschlusskosten neuer zertifizierter Verträge: verteilt auf die **gesamte Ansparphase** (§ 1 Abs. 1 Nr. 8 AltZertG n. F.); „mindestens 5 Jahre“ gilt für Altverträge. Im Depot-Modell bilden die Depot-Abschlusskosten deshalb einen Prozentsatz je Beitrag über die gesamte Laufzeit ab.
+- Sonderausgabenabzug neu: 1.800 € **zuzüglich** Zulage (bisher 2.100 € einschließlich).
+- Einzahlungsgrenze Depot: 6.840 € je Vertrag und Jahr. Deshalb legt das Szenario „Kündigung + Depot“ den Rückkaufswert in einer freien Anlage an.
+- Neuabschluss ab 2027 überführt alle Bestandsverträge ins neue Recht (§ 52 Abs. 50a S. 6 EStG n. F.). In den Szenarien C und D ist das berücksichtigt.
+
+**2026-11-03 · Zwei Lesarten als Option umgesetzt (bitte prüfen):**
+1. Wechselkosten des abgebenden Bestandsvertrags: **D1** max. 150 € ohne Frist (a. F.) und **D2** kostenfrei nach 5 Jahren (n. F.).
+2. Kinderzulage bei mehreren Kindern: **je Kind volle 100 %** (Standard, Wortlaut „für jedes Kind“) oder **geteilt** (Summe ≤ Eigenbeitrag). Wählbar in den Szenarien.
+
+„Keine Doppelförderung im Wechseljahr“ steht so nicht ausdrücklich im Gesetz. Klarwert setzt es um, indem je Beitragsjahr genau eine Regel gilt.
+
+**2026-11-03 · Effektivkosten = IRR(ohne Kosten) − IRR(mit Kosten)** bis Rentenbeginn, monatliche Zahlungsströme, geometrische Annualisierung.
+Bei Guthabenkosten von x % p.a. ergibt sich eine Renditeminderung von ≈ x·(1+r). Das ist methodisch konsistent mit einer monatlichen Entnahme nach Wertentwicklung.
+
+**2026-11-03 · Zerlegung der Effektivkosten nach Kostenart sequentiell** (α, β, γ, κ, Fonds, Garantie, Freistellung). Die Summe ist exakt, die Anteile sind eine Näherung und so gekennzeichnet.
+
+**2026-11-03 · Zulagengutschrift im März des Folgejahres** (`creditLagMonths = 3`). Zulagen, die erst nach Ende der Ansparphase fällig wären, schreibt Klarwert im letzten Ansparmonat gut, damit keine Förderung verloren geht.
+
+**2026-11-03 · Szenarien starten am Stichtag mit dem Ist-Guthaben.**
+Alle Szenarien haben dieselbe Ausgangsbasis: Guthaben, Eigenbeiträge, Bruttorendite und Rentenbeginn sind gleich. Wechselkosten und Stornoabzüge zählen als Kosten. Wechselzeitpunkt: max(Stichtag, 01.01.2027).
+
+**2026-11-03 · Übertragungswert** ist standardmäßig der Rückkaufswert. Liegt der Stichtag der Standmitteilung auf dem Wechselmonat, gilt der dort ausgewiesene Rückkaufswert, sonst der aus den Stornoregeln fortgeschriebene.
+
+**2026-11-03 · Depot-Standardwerte (Annahmen, vor Marktstart unbekannt):**
+- Verwaltung 0,3 % p.a.
+- Fonds-TER 0,2 % p.a.
+- keine festen Kosten
+- keine Abschlusskosten
+- ohne Garantie
+
+Alles ist als Eingabe änderbar und im Report als Annahme gekennzeichnet.
+
+**2026-11-03 · Kostenkatalog** (`packages/extraction/src/fields.ts`): Pflichtwerte müssen bestätigt sein, 0 bedeutet „keine Kosten dieser Art“. Rentenfaktoren dürfen als „nicht angegeben“ (null) bestätigt werden, weil sie bei Fondstarifen oft erst zu Rentenbeginn feststehen.
+
+**2026-11-03 · Riester-Nettoauszahlung bei schädlicher Verwendung** = Rückkaufswert − erhaltene Zulagen − eingegebene Steuervorteile. Die Steuervorteile sind eine Annahme des Beraters; Klarwert berechnet sie nicht.
+
+## KI
+
+**2026-11-03 · Modell `claude-opus-5-5`, Effort `high`, strukturierte Ausgabe über `client.beta.messages.parse` mit `betaZodOutputFormat`; serverseitiger Fallback bei Ablehnung (`fallbacks: "default"`).** Alles per Umgebungsvariable änderbar.
+
+**2026-11-03 · Websuche über das Anthropic-Tool `web_search_20260209`.**
+Die gefundenen PDFs lädt der Server herunter (nur https, keine internen Adressen, PDF-Signatur geprüft) und legt sie als **Kandidat** ab, nie automatisch als gültig.
+
+**2026-11-03 · Kostenextraktion arbeitet bevorzugt mit dem Seitentext des Bedingungswerks** (günstiger, Seitenangaben eindeutig). Hat das Dokument keinen Textlayer, geht das PDF als Dokument an das Modell.
+
+## Abnahme
+
+**2026-11-03 · PIB-Wert des synthetischen Angebots (Fall 3) wird aus den dokumentierten Kostenparametern mit dem Rechenkern erzeugt (1,04 Pp. bei 3,0 %).**
+Der Fall prüft damit die Konsistenz der Kette Dokument → Erkennung → Bestätigung → Berechnung, nicht die Methodik gegen einen Versicherer. Das Abnahmeziel von höchstens 0,1 Pp. Abweichung gegenüber echten PIBs prüft der Echtfall-Plan in `tests/fixtures/real/README.md`.

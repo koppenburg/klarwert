@@ -1,4 +1,4 @@
-import { createRequire } from "node:module";
+import { packageDir } from "./resolve";
 import path from "node:path";
 import Tesseract from "tesseract.js";
 
@@ -35,8 +35,7 @@ let queue: Promise<unknown> = Promise.resolve();
 export function tessdataDir(): string {
   const fromEnv = process.env["KLARWERT_TESSDATA_DIR"];
   if (fromEnv && fromEnv.length > 0) return fromEnv;
-  const require = createRequire(import.meta.url);
-  return path.join(path.dirname(require.resolve("@tesseract.js-data/deu/package.json")), "4.0.0_best_int");
+  return path.join(packageDir("@tesseract.js-data/deu"), "4.0.0_best_int");
 }
 
 function getWorker(): Promise<Tesseract.Worker> {

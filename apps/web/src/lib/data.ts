@@ -157,7 +157,7 @@ export function fieldProvenance(f: CaseFieldRow): Provenance | null {
     return { kind: "document", label: `${s.fileName ?? "Dokument"}${s.page ? `, S. ${s.page}` : ""}${s.region ? `, ${s.region}` : ""}`, quote: s.quote ?? null };
   }
   if (s.kind === "assumption") return { kind: "assumption", label: s.note ?? "Annahme des Beraters" };
-  return { kind: "manual", label: s.note ? `manuell: ${s.note}` : "manuell erfasst" };
+  return { kind: "manual", label: s.note ? s.note : "vom Berater erfasst" };
 }
 
 export function costProvenance(c: CostItemRow, docs: LibraryDocumentRow[]): Provenance {

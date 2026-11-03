@@ -6,7 +6,11 @@ import { CONTRACT_FIELDS, COST_FIELDS, type BuiltModel, type Provenance } from "
 import { GROUP_LABELS, listConstants, type LegalConfig } from "@klarwert/legal-config";
 import { SETTING_LABELS, type AnalysisSettings } from "@/lib/analysis-settings";
 import type { CaseBundle } from "@/lib/data";
+import { FREQUENCY_LABELS, LAYER_LABELS } from "@klarwert/extraction";
 import { formatValue } from "@/lib/format";
+
+const ENUM_LABELS: Record<string, Record<string, string>> = { layer: LAYER_LABELS, payment_frequency: FREQUENCY_LABELS, product_type: { fonds: "fondsgebunden", klassisch: "klassisch", hybrid: "hybrid", index: "Indexpolice", sonstige: "sonstige" } };
+const COST_ENUM_LABELS: Record<string, string> = { permille_of_premium_sum: "‰ der Beitragssumme", percent_of_premiums: "% je Beitrag" };
 
 export interface SourceEntry {
   ref: string;
@@ -52,7 +56,7 @@ export function buildSourceRegister(bundle: CaseBundle, built: BuiltModel, setti
       ref: `V${++v}`,
       group: "V",
       label: def.label,
-      value: def.key === "funds" || def.key === "top_ups" ? summarizeJson(f.value) : formatValue(f.value, def.unit),
+      value: def.key === "funds" || def.key === "top_ups" ? summarizeJson(f.value) : typeof f.value === "string" && ENUM_LABELS[def.key]?.[f.value] ? (ENUM_LABELS[def.key]?.[f.value] as string) : formatValue(f.value, def.unit),
       source: p ? `${KIND_LABEL[p.kind]}: ${p.label}` : "ohne Fundstelle",
       quote: p?.quote ?? null,
     });
@@ -68,7 +72,7 @@ export function buildSourceRegister(bundle: CaseBundle, built: BuiltModel, setti
       ref: `K${++k}`,
       group: "K",
       label: `${def.label}${c.case_id ? " (vertragsindividuell)" : ""}`,
-      value: c.value === null ? "im Bedingungswerk nicht angegeben" : formatValue(c.value, def.unit),
+      value: c.value === null ? "im Bedingungswerk nicht angegeben" : typeof c.value === "string" && COST_ENUM_LABELS[c.value] ? (COST_ENUM_LABELS[c.value] as string) : formatValue(c.value, def.unit),
       source: p ? `${KIND_LABEL[p.kind]}: ${p.label}` : "ohne Fundstelle",
       quote: p?.quote ?? null,
     });

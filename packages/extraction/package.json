@@ -4,10 +4,15 @@
   "private": true,
   "type": "module",
   "description": "Zod-Schemas, Prompts und Anthropic-Aufrufe für Vertrags- und Kostenextraktion sowie Tarif-Matching.",
-  "exports": { ".": "./src/index.ts" },
-  "scripts": { "typecheck": "tsc -p tsconfig.json" },
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json"
+  },
   "dependencies": {
     "@anthropic-ai/sdk": "^1.4.0",
-    "zod": "^4.6.7"
+    "zod": "^4.6.7",
+    "@klarwert/calc": "workspace:*"
   }
 }

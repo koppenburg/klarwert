@@ -13,7 +13,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { betaZodOutputFormat } from "@anthropic-ai/sdk/helpers/beta/zod";
 import type { z } from "zod";
-import { CONTRACT_SYSTEM_PROMPT, COST_SYSTEM_PROMPT, DISCOVERY_SYSTEM_PROMPT, FEATURE_SYSTEM_PROMPT, SEARCH_SYSTEM_PROMPT, contractUserPrompt, costUserPrompt, discoveryUserPrompt, featureUserPrompt, searchUserPrompt } from "./prompts";
+import { CONTRACT_SYSTEM_PROMPT, COST_SYSTEM_PROMPT, DISCOVERY_SYSTEM_PROMPT, DOCUMENT_FINDER_SYSTEM_PROMPT, FEATURE_SYSTEM_PROMPT, SEARCH_SYSTEM_PROMPT, contractUserPrompt, costUserPrompt, discoveryUserPrompt, documentFinderUserPrompt, featureUserPrompt, searchUserPrompt } from "./prompts";
 import { ContractExtractionRaw, CostExtraction, FeatureExtraction, normalizeContractExtraction, SearchCandidates, TariffDiscovery, type ContractExtraction } from "./schemas";
 
 export type Effort = "low" | "medium" | "high" | "xhigh" | "max";
@@ -192,7 +192,7 @@ export async function discoverTariffs(
   if (!cfg.webSearchEnabled) throw new ExtractionError("Websuche ist deaktiviert (ANTHROPIC_WEBSEARCH_ENABLED=false).");
   const today = new Date().toISOString().slice(0, 10);
   const { parsed, model, message } = await parseWith(cfg, TariffDiscovery, DISCOVERY_SYSTEM_PROMPT, [{ type: "text", text: discoveryUserPrompt({ ...meta, today }) }], {
-    tools: [{ type: "web_search_20260209", name: "web_search", max_uses: opts.maxUses ?? Math.max(cfg.webSearchMaxUses, 8), user_location: { type: "approximate", country: "DE" } }],
+    tools: [{ type: "web_search_20260209", name: "web_search", max_uses: opts.maxUses ?? Math.max(cfg.webSearchMaxUses, 12), user_location: { type: "approximate", country: "DE" } }],
   });
   const urls = new Set<string>();
   for (const block of message.content) {
@@ -201,4 +201,66 @@ export async function discoverTariffs(
     }
   }
   return { products: parsed.products, remarks: parsed.remarks, searchResultUrls: [...urls], model };
+}
+
+function hostOf(u: string): string | null {
+  try {
+    return new URL(u).hostname.replace(/^www\./, "");
+  } catch {
+    return null;
+  }
+}
+
+/** URLs aus Suchergebnissen und geöffneten Seiten einer Antwort. */
+function collectSeenUrls(message: Anthropic.Beta.Messages.BetaMessage): string[] {
+  const urls = new Set<string>();
+  for (const block of message.content) {
+    if (block.type === "web_search_tool_result" && Array.isArray(block.content)) {
+      for (const r of block.content) if (r.type === "web_search_result") urls.add(r.url);
+    }
+    if (block.type === "web_fetch_tool_result" && block.content.type === "web_fetch_result") urls.add(block.content.url);
+  }
+  return [...urls];
+}
+
+export interface FoundDocument {
+  url: string;
+  title: string;
+  kind: "avb" | "tarifbestimmungen" | "pib" | "kostenblatt" | "sonstiges";
+  matchesGeneration: "ja" | "unklar" | "nein";
+  reason: string;
+  /** URL stammt aus Suchergebnis/geöffneter Seite oder liegt auf derselben Domain wie eine geöffnete Seite */
+  grounded: boolean;
+}
+
+/**
+ * Dokumente eines Tarifs finden: Produktseite öffnen (web_fetch) und verlinkte PDFs auslesen, sonst gezielt suchen.
+ * Links, die weder gesehen wurden noch auf einer besuchten Domain liegen, werden verworfen.
+ */
+export async function findTariffDocuments(
+  meta: { insurer: string; tariff: string; tariffCode?: string | null; generation?: string | null; productUrl?: string | null },
+  cfg: ModelConfig = modelConfigFromEnv(),
+): Promise<{ documents: FoundDocument[]; dropped: string[]; remarks: string | null; model: string }> {
+  if (!cfg.webSearchEnabled) throw new ExtractionError("Websuche ist deaktiviert (ANTHROPIC_WEBSEARCH_ENABLED=false).");
+  const { parsed, model, message } = await parseWith(cfg, SearchCandidates, DOCUMENT_FINDER_SYSTEM_PROMPT, [{ type: "text", text: documentFinderUserPrompt(meta) }], {
+    tools: [
+      { type: "web_fetch_20260209", name: "web_fetch", max_uses: 6, max_content_tokens: 60_000 },
+      { type: "web_search_20260209", name: "web_search", max_uses: 6, user_location: { type: "approximate", country: "DE" } },
+    ],
+  });
+  const seen = new Set(collectSeenUrls(message));
+  if (meta.productUrl) seen.add(meta.productUrl);
+  const hosts = new Set([...seen].map(hostOf).filter((h): h is string => !!h));
+  const documents: FoundDocument[] = [];
+  const dropped: string[] = [];
+  for (const c of parsed.candidates) {
+    const host = hostOf(c.url);
+    const grounded = seen.has(c.url) || (host !== null && [...hosts].some((h) => host === h || host.endsWith(`.${h}`) || h.endsWith(`.${host}`)));
+    if (!grounded) {
+      dropped.push(c.url);
+      continue;
+    }
+    documents.push({ url: c.url, title: c.title, kind: c.kind, matchesGeneration: c.matches_generation, reason: c.reason, grounded });
+  }
+  return { documents, dropped, remarks: parsed.remarks, model };
 }

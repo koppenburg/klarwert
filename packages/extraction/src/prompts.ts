@@ -78,3 +78,16 @@ export function discoveryUserPrompt(meta: { insurer: string; aliases: string[]; 
   return `Versicherer: ${meta.insurer}${meta.aliases.length ? ` (auch: ${meta.aliases.join(", ")})` : ""}.
 Gesucht: aktuelle Altersvorsorgetarife${meta.layers.length ? ` der Schichten ${meta.layers.join(", ")}` : ""}, Stand ${meta.today}, jeweils mit Produktseite und direkten PDF-Links zu Bedingungen, Kosteninformationen und Basisinformations- bzw. Produktinformationsblatt.`;
 }
+
+export const DOCUMENT_FINDER_SYSTEM_PROMPT = `Du beschaffst für ein Maklerbüro die öffentlichen Vertragsdokumente eines Altersvorsorgetarifs: Basisinformationsblatt (PRIIPs/KID) bzw. Produktinformationsblatt, Allgemeine Versicherungsbedingungen, Tarifbestimmungen und Kosteninformationen.
+
+Vorgehen:
+1. Öffne die angegebene Produktseite des Versicherers mit web_fetch und lies die dort verlinkten PDF-Dokumente aus (Downloadbereich, „Dokumente“, „Verbraucherinformationen“, „Basisinformationsblatt“).
+2. Fehlt die Produktseite oder enthält sie keine Dokumente, suche mit web_search auf der Website des Versicherers gezielt nach den Dokumenten und öffne passende Seiten mit web_fetch.
+3. Gib nur direkte Dokument-URLs an, die du auf einer geöffneten Seite oder in Suchergebnissen gesehen hast. Erfinde keine URLs. Bevorzuge Dokumente, die genau zu diesem Tarif bzw. Vorsorgekonzept gehören; allgemeine Dokumente nur, wenn es keine spezifischeren gibt.`;
+
+export function documentFinderUserPrompt(meta: { insurer: string; tariff: string; tariffCode?: string | null; generation?: string | null; productUrl?: string | null }): string {
+  return `Tarif: ${meta.insurer} – ${meta.tariff}${meta.tariffCode ? ` (Kürzel ${meta.tariffCode})` : ""}${meta.generation ? `, Stand ${meta.generation}` : ""}.
+${meta.productUrl ? `Produktseite: ${meta.productUrl}` : "Keine Produktseite bekannt."}
+Liste die Dokument-PDFs mit URL, Titel und Art auf.`;
+}

@@ -43,7 +43,15 @@ async function postJson(url: string, body?: unknown): Promise<{ ok: boolean; dat
   }
 }
 
-function CandidateRow({ c, enabled }: { c: CandidateView; enabled: boolean }) {
+async function fetchDocuments(id: string): Promise<string> {
+  const r = await postJson(`/api/research/candidates/${id}/documents`);
+  if (!r.ok) return String(r.data.error);
+  const results = (r.data.results as Array<{ status: string }> | undefined) ?? [];
+  const stored = Number(r.data.stored ?? 0);
+  return `${stored} von ${results.length} Dokument(en) geladen${r.data.searched ? " (Produktseite/gezielte Suche)" : ""}${Number(r.data.dropped) ? `, ${r.data.dropped} unbelegte Link(s) verworfen` : ""}.${stored === 0 && r.data.remarks ? ` ${String(r.data.remarks)}` : ""}`;
+}
+
+function CandidateRow({ c, enabled, bulkMsg }: { c: CandidateView; enabled: boolean; bulkMsg?: string }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
@@ -77,9 +85,9 @@ function CandidateRow({ c, enabled }: { c: CandidateView; enabled: boolean }) {
             ))}
           </ul>
         ) : (
-          <span className="text-muted">{c.documentLinks.length ? `${c.documentLinks.length} Link(s) gefunden, noch nicht geladen` : "keine Links – gezielte Suche möglich"}</span>
+          <span className="text-muted">{c.documentLinks.length ? `${c.documentLinks.length} Link(s) gefunden, noch nicht geladen` : "noch keine Dokumente – „Dokumente holen“ öffnet die Produktseite"}</span>
         )}
-        {msg && <p className="mt-1 text-muted">{msg}</p>}
+        {(msg ?? bulkMsg) && <p className="mt-1 text-muted">{msg ?? bulkMsg}</p>}
       </td>
       <td className="w-64">
         <div className="space-y-2">
@@ -89,9 +97,7 @@ function CandidateRow({ c, enabled }: { c: CandidateView; enabled: boolean }) {
             onClick={async () => {
               setBusy(true);
               setMsg(null);
-              const r = await postJson(`/api/research/candidates/${c.id}/documents`);
-              const results = (r.data.results as Array<{ status: string }> | undefined) ?? [];
-              setMsg(r.ok ? `${results.filter((x) => !x.status.startsWith("nicht")).length} von ${results.length} Dokument(en) geladen${r.data.searched ? " (gezielte Suche)" : ""}.` : String(r.data.error));
+              setMsg(await fetchDocuments(c.id));
               setBusy(false);
               router.refresh();
             }}
@@ -135,7 +141,23 @@ export function ResearchPanel({ insurers, candidates, enabled }: { insurers: Ins
   const [layers, setLayers] = useState<string[]>(["riester", "basis", "layer3", "bav"]);
   const [running, setRunning] = useState<string | null>(null);
   const [log, setLog] = useState<string[]>([]);
+  const [bulk, setBulk] = useState<Record<string, string>>({});
   const stop = useRef(false);
+
+  async function documentsForAll(ins: InsurerView) {
+    stop.current = false;
+    setRunning(ins.id);
+    const list = candidates.filter((c) => c.insurerId === ins.id && c.status !== "rejected" && c.libraryDocs.length === 0);
+    for (const [i, c] of list.entries()) {
+      if (stop.current) break;
+      setBulk((b) => ({ ...b, [c.id]: `lädt … (${i + 1}/${list.length})` }));
+      const m = await fetchDocuments(c.id);
+      setBulk((b) => ({ ...b, [c.id]: m }));
+    }
+    setLog((l) => [...l, `${ins.name}: Dokumentsuche für ${list.length} Vorschlag/Vorschläge abgeschlossen.`]);
+    setRunning(null);
+    router.refresh();
+  }
 
   async function research(ins: InsurerView): Promise<void> {
     setRunning(ins.id);
@@ -194,7 +216,9 @@ export function ResearchPanel({ insurers, candidates, enabled }: { insurers: Ins
             </Button>
           )}
         </div>
-        <p className="mt-2 text-xs text-muted">Je Versicherer etwa 1–2 Minuten und einige Websuchen auf dem Anthropic-Konto. Die Ergebnisse erscheinen unten, sobald ein Versicherer fertig ist.</p>
+        <p className="mt-2 text-xs text-muted">
+          Je Versicherer etwa 1–2 Minuten und einige Websuchen auf dem Anthropic-Konto; „Dokumente holen“ öffnet je Vorschlag die Produktseite (etwa 1–2 Minuten je Vorschlag). Laufende Vorgänge lassen sich nach dem aktuellen Schritt anhalten.
+        </p>
         {log.length > 0 && (
           <ul className="mt-3 space-y-1 text-xs">
             {log.map((l, i) => (
@@ -216,9 +240,16 @@ export function ResearchPanel({ insurers, candidates, enabled }: { insurers: Ins
               </span>
             }
             actions={
-              <Button variant="secondary" disabled={!enabled || running !== null} onClick={() => research(ins)}>
-                {running === ins.id ? "recherchiert …" : "Tarife recherchieren"}
-              </Button>
+              <span className="flex gap-2">
+                {list.some((c) => c.libraryDocs.length === 0) && (
+                  <Button variant="secondary" disabled={!enabled || running !== null} onClick={() => documentsForAll(ins)}>
+                    Dokumente für alle Vorschläge holen
+                  </Button>
+                )}
+                <Button variant="secondary" disabled={!enabled || running !== null} onClick={() => research(ins)}>
+                  {running === ins.id ? "läuft …" : "Tarife recherchieren"}
+                </Button>
+              </span>
             }
           >
             {ins.last_research_remarks && <p className="mb-2 text-xs text-muted">Hinweis der Recherche: {ins.last_research_remarks}</p>}
@@ -233,7 +264,7 @@ export function ResearchPanel({ insurers, candidates, enabled }: { insurers: Ins
                 </thead>
                 <tbody>
                   {list.map((c) => (
-                    <CandidateRow key={c.id} c={c} enabled={enabled} />
+                    <CandidateRow key={c.id} c={c} enabled={enabled} bulkMsg={bulk[c.id]} />
                   ))}
                 </tbody>
               </Table>

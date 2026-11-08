@@ -43,6 +43,7 @@ export default function DocumentsStep({ bundle }: { bundle: CaseBundle }) {
           }
         >
           <div className="space-y-4">
+            {!d.sanitized_pages?.length && <Notice tone="bad">Bereinigung fehlgeschlagen oder nicht abgeschlossen – dieses Dokument geht nicht an die KI. Bitte löschen und erneut hochladen.</Notice>}
             <p className="text-sm">
               Entfernt:{" "}
               {Object.entries(d.pii_summary ?? {}).length
@@ -67,7 +68,7 @@ export default function DocumentsStep({ bundle }: { bundle: CaseBundle }) {
                 </div>
               ))}
             </div>
-            <DocumentActions caseId={caseId} documentId={d.id} approved={!!d.sanitized_approved_at} hasOriginal={!!d.original_path} />
+            <DocumentActions caseId={caseId} documentId={d.id} approved={!!d.sanitized_approved_at} hasOriginal={!!d.original_path} sanitized={!!d.sanitized_pages?.length} />
           </div>
         </Card>
       ))}

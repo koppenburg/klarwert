@@ -4,11 +4,11 @@ import { useTransition } from "react";
 import { approveSanitized, deleteDocument, deleteOriginalNow } from "@/app/(app)/faelle/[id]/actions";
 import { Button } from "../ui";
 
-export function DocumentActions({ caseId, documentId, approved, hasOriginal }: { caseId: string; documentId: string; approved: boolean; hasOriginal: boolean }) {
+export function DocumentActions({ caseId, documentId, approved, hasOriginal, sanitized }: { caseId: string; documentId: string; approved: boolean; hasOriginal: boolean; sanitized: boolean }) {
   const [pending, start] = useTransition();
   return (
     <div className="flex flex-wrap gap-2">
-      {!approved && (
+      {sanitized && !approved && (
         <Button disabled={pending} onClick={() => start(() => approveSanitized(caseId, documentId))}>
           Bereinigte Fassung geprüft – freigeben
         </Button>

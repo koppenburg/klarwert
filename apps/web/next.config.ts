@@ -30,6 +30,7 @@ const nextConfig: NextConfig = {
     "/api/cases/*/extract": ocrFiles,
     "/api/library/register": ocrFiles,
     "/api/library/search": ocrFiles,
+    "/api/diagnose": ocrFiles,
     "/api/cases/*/report": ["../../node_modules/.pnpm/@sparticuz+chromium@*/node_modules/@sparticuz/chromium/bin/**"],
   },
   experimental: {

@@ -29,13 +29,30 @@ function isAllowedUrl(raw: string): boolean {
 export async function downloadPdf(url: string, opts: { timeoutMs?: number; fetchImpl?: typeof fetch } = {}): Promise<DownloadedPdf> {
   if (!isAllowedUrl(url)) throw new DownloadError("Nur öffentliche https-Adressen sind erlaubt.");
   const f = opts.fetchImpl ?? fetch;
-  const res = await f(url, { redirect: "follow", signal: AbortSignal.timeout(opts.timeoutMs ?? 30_000), headers: { "user-agent": "Klarwert/1.0 (Bedingungswerk-Abruf)" } });
-  if (!res.ok) throw new DownloadError(`Abruf fehlgeschlagen (HTTP ${res.status}).`);
+  let res: Response;
+  try {
+    res = await f(url, {
+      redirect: "follow",
+      signal: AbortSignal.timeout(opts.timeoutMs ?? 45_000),
+      headers: { "user-agent": "Klarwert/1.0 (Abruf oeffentlicher Versicherungsbedingungen)", accept: "application/pdf,application/octet-stream;q=0.9,*/*;q=0.5" },
+    });
+  } catch (e) {
+    const cause = e instanceof Error ? (e.name === "TimeoutError" ? "Zeitüberschreitung" : e.message) : "Netzwerkfehler";
+    throw new DownloadError(`nicht erreichbar (${cause})`);
+  }
+  const host = (() => {
+    try {
+      return new URL(res.url || url).hostname;
+    } catch {
+      return "?";
+    }
+  })();
+  if (!res.ok) throw new DownloadError(`HTTP ${res.status} von ${host}${res.headers.get("content-type") ? ` (${res.headers.get("content-type")})` : ""}`);
   const len = Number(res.headers.get("content-length") ?? 0);
   if (len > MAX_BYTES) throw new DownloadError("Datei zu groß.");
   const buf = new Uint8Array(await res.arrayBuffer());
   if (buf.byteLength > MAX_BYTES) throw new DownloadError("Datei zu groß.");
   const magic = new TextDecoder().decode(buf.slice(0, 5));
-  if (magic !== "%PDF-") throw new DownloadError("Keine PDF-Datei.");
+  if (magic !== "%PDF-") throw new DownloadError(`Keine PDF-Datei (${res.headers.get("content-type") ?? "unbekannter Typ"} von ${host}${magic.startsWith("<") ? ", vermutlich Webseite oder Zugangssperre" : ""})`);
   return { url: res.url || url, data: buf, sizeBytes: buf.byteLength, contentType: res.headers.get("content-type") };
 }

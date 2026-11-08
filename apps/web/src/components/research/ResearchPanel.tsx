@@ -43,18 +43,45 @@ async function postJson(url: string, body?: unknown): Promise<{ ok: boolean; dat
   }
 }
 
-async function fetchDocuments(id: string): Promise<string> {
-  const r = await postJson(`/api/research/candidates/${id}/documents`);
-  if (!r.ok) return String(r.data.error);
-  const results = (r.data.results as Array<{ status: string }> | undefined) ?? [];
-  const stored = Number(r.data.stored ?? 0);
-  return `${stored} von ${results.length} Dokument(en) geladen${r.data.searched ? " (Produktseite/gezielte Suche)" : ""}${Number(r.data.dropped) ? `, ${r.data.dropped} unbelegte Link(s) verworfen` : ""}.${stored === 0 && r.data.remarks ? ` ${String(r.data.remarks)}` : ""}`;
+interface FetchOutcome {
+  text: string;
+  failures: string[];
 }
 
-function CandidateRow({ c, enabled, bulkMsg }: { c: CandidateView; enabled: boolean; bulkMsg?: string }) {
+async function fetchDocuments(id: string): Promise<FetchOutcome> {
+  const r = await postJson(`/api/research/candidates/${id}/documents`);
+  if (!r.ok) return { text: String(r.data.error), failures: [] };
+  const results = (r.data.results as Array<{ url: string; title: string; status: string }> | undefined) ?? [];
+  const stored = Number(r.data.stored ?? 0);
+  return {
+    text: `${stored} von ${results.length} Dokument(en) geladen${r.data.searched ? " (Produktseite/gezielte Suche)" : ""}${Number(r.data.dropped) ? `, ${r.data.dropped} unbelegte Link(s) verworfen` : ""}.`,
+    failures: results.filter((x) => x.status.startsWith("nicht")).map((x) => `${x.title}: ${x.status.replace(/^nicht abrufbar: /, "")}`),
+  };
+}
+
+function Outcome({ o }: { o: FetchOutcome }) {
+  return (
+    <div className="mt-1 text-muted">
+      <p>{o.text}</p>
+      {o.failures.length > 0 && (
+        <details>
+          <summary className="cursor-pointer text-warn">{o.failures.length} nicht geladen – Gründe</summary>
+          <ul className="list-disc pl-4">
+            {o.failures.map((f, i) => (
+              <li key={i}>{f}</li>
+            ))}
+          </ul>
+        </details>
+      )}
+    </div>
+  );
+}
+
+function CandidateRow({ c, enabled, bulkMsg }: { c: CandidateView; enabled: boolean; bulkMsg?: FetchOutcome }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
-  const [msg, setMsg] = useState<string | null>(null);
+  const [msg, setMsg] = useState<FetchOutcome | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const [label, setLabel] = useState(c.generationLabel ?? "");
   const [pending, start] = useTransition();
   return (
@@ -87,7 +114,8 @@ function CandidateRow({ c, enabled, bulkMsg }: { c: CandidateView; enabled: bool
         ) : (
           <span className="text-muted">{c.documentLinks.length ? `${c.documentLinks.length} Link(s) gefunden, noch nicht geladen` : "noch keine Dokumente – „Dokumente holen“ öffnet die Produktseite"}</span>
         )}
-        {(msg ?? bulkMsg) && <p className="mt-1 text-muted">{msg ?? bulkMsg}</p>}
+        {(msg ?? bulkMsg) && <Outcome o={(msg ?? bulkMsg) as FetchOutcome} />}
+        {error && <p className="mt-1 text-bad">{error}</p>}
       </td>
       <td className="w-64">
         <div className="space-y-2">
@@ -113,7 +141,7 @@ function CandidateRow({ c, enabled, bulkMsg }: { c: CandidateView; enabled: bool
                   onClick={() =>
                     start(async () => {
                       const r = await acceptCandidate(c.id, label);
-                      if (r.error) setMsg(r.error);
+                      if (r.error) setError(r.error);
                       else router.push(`/bibliothek/${r.generationId}`);
                     })
                   }
@@ -141,7 +169,7 @@ export function ResearchPanel({ insurers, candidates, enabled }: { insurers: Ins
   const [layers, setLayers] = useState<string[]>(["riester", "basis", "layer3", "bav"]);
   const [running, setRunning] = useState<string | null>(null);
   const [log, setLog] = useState<string[]>([]);
-  const [bulk, setBulk] = useState<Record<string, string>>({});
+  const [bulk, setBulk] = useState<Record<string, FetchOutcome>>({});
   const stop = useRef(false);
 
   async function documentsForAll(ins: InsurerView) {
@@ -150,7 +178,7 @@ export function ResearchPanel({ insurers, candidates, enabled }: { insurers: Ins
     const list = candidates.filter((c) => c.insurerId === ins.id && c.status !== "rejected" && c.libraryDocs.length === 0);
     for (const [i, c] of list.entries()) {
       if (stop.current) break;
-      setBulk((b) => ({ ...b, [c.id]: `lädt … (${i + 1}/${list.length})` }));
+      setBulk((b) => ({ ...b, [c.id]: { text: `lädt … (${i + 1}/${list.length})`, failures: [] } }));
       const m = await fetchDocuments(c.id);
       setBulk((b) => ({ ...b, [c.id]: m }));
     }

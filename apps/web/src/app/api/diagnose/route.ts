@@ -20,7 +20,8 @@ export async function GET() {
   return NextResponse.json({
     cwd,
     metaUrl: import.meta.url,
-    ls: { cwd: ls(cwd), nm: ls(path.join(cwd, "node_modules")), webNm: ls(path.join(cwd, "apps/web/node_modules")) },
+    ls: { cwd: ls(cwd), nm: ls(path.join(cwd, "node_modules")), root: ls(path.join(cwd, "../..")), rootNm: ls(path.join(cwd, "../../node_modules")), privacyNm: ls(path.join(cwd, "../../packages/privacy/node_modules")) },
+    rootPnpm: ls(path.join(cwd, "../../node_modules/.pnpm")).toString().split(",").filter((x) => /pdfjs|tesseract|sharp|canvas|chromium|playwright/.test(x)),
     exists: Object.fromEntries(candidates.map((c) => [c, existsSync(path.join(cwd, c))])),
     pnpm: ls(path.join(cwd, "node_modules/.pnpm")).toString().split(",").filter((x) => /pdfjs|tesseract|sharp|canvas|chromium/.test(x)),
   });

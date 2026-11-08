@@ -6,6 +6,7 @@ import { useRef, useState, useTransition } from "react";
 import { acceptCandidate, rejectCandidate } from "@/app/(app)/bibliothek/recherche/actions";
 import { prioritizeDocuments } from "@/lib/document-priority";
 import { LibraryUpload } from "../library/LibraryUpload";
+import { BulkUpload } from "./BulkUpload";
 import { Badge, Button, Card, inputClass, Notice, Table } from "../ui";
 
 export interface InsurerView {
@@ -70,7 +71,7 @@ function Outcome({ o }: { o: FetchOutcome }) {
       <p>{o.text}</p>
       {o.blocked && o.blocked.length > 0 && (
         <p className="text-warn">
-          {o.blocked.join(", ")} sperrt automatische Abrufe. Bitte die Dokumente unten im Browser öffnen, speichern und hier hochladen.
+          {o.blocked.join(", ")} sperrt automatische Abrufe. Bitte die Dokumente im Browser öffnen, speichern und über den Sammel-Upload des Versicherers (oder hier einzeln) hochladen.
         </p>
       )}
       {o.failures.length > 0 && (
@@ -339,6 +340,14 @@ export function ResearchPanel({ insurers, candidates, enabled }: { insurers: Ins
             }
           >
             {ins.last_research_remarks && <p className="mb-2 text-xs text-muted">Hinweis der Recherche: {ins.last_research_remarks}</p>}
+            {list.length > 0 && (
+              <details className="mb-3 rounded-md border border-line p-3">
+                <summary className="cursor-pointer text-sm font-medium text-brand">Sammel-Upload: im Browser gespeicherte PDFs auf einmal zuordnen</summary>
+                <div className="mt-3">
+                  <BulkUpload insurerId={ins.id} candidates={list.map((c) => ({ id: c.id, name: c.name, generationId: c.generationId }))} />
+                </div>
+              </details>
+            )}
             {list.length ? (
               <Table>
                 <thead>

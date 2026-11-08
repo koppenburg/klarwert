@@ -13,6 +13,8 @@ const Body = z.object({
   kind: z.enum(["avb", "tarifbestimmungen", "pib", "kostenblatt", "sonstiges"]),
   title: z.string().min(1).max(300),
   confirmed: z.boolean(),
+  /** optional: Dokument einem Vorschlag der Tarifrecherche zuordnen */
+  tariffCandidateId: z.string().uuid().nullable().optional(),
 });
 
 /** Nach direktem Upload in den Bucket „library“: Seitentexte erfassen und Eintrag anlegen. */
@@ -34,6 +36,9 @@ export async function POST(request: NextRequest) {
       confirmedBy: auth.user.id,
       storagePath: body.data.storagePath,
     });
+    if (body.data.tariffCandidateId) {
+      await auth.supabase.from("library_documents").update({ tariff_candidate_id: body.data.tariffCandidateId }).eq("id", r.id).is("tariff_candidate_id", null);
+    }
     return NextResponse.json(r);
   } catch (e) {
     return NextResponse.json({ error: e instanceof Error ? e.message : "Fehler" }, { status: 500 });

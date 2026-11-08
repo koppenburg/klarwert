@@ -79,6 +79,8 @@ Klarwert rechnet daraufhin jeden Tarif des Katalogs unter identischen Annahmen d
 2. **Dokumente holen:** Bedingungen, Kosteninformationen und Basisinformations- bzw. Produktinformationsblätter werden geladen und als **Kandidaten** in der Bibliothek abgelegt. Fehlen Links, sucht die KI gezielt nach dem Bedingungswerk.
 3. **In Katalog übernehmen:** Daraus entstehen Tarif und Generation, die Dokumente werden zugeordnet. Danach folgen die bekannten Schritte auf der Generationsseite: Dokumente bestätigen, Kosten, Merkmale und Staffeln vorschlagen lassen, jeden Wert bestätigen.
 
+**Wenn ein Versicherer automatische Abrufe sperrt** (z. B. Bot-Schutz des Dokumentenportals, HTTP 403), respektiert Klarwert das: Es gibt keine weiteren Versuche und keine Umgehung. Je Vorschlag stehen die gefundenen Links, sortiert nach Bedeutung, zum Öffnen im Browser bereit. Das gespeicherte PDF lädt der Berater über „PDF aus dem Browser hochladen“ hoch und ordnet es damit dem Vorschlag zu. Vorhandene Links lösen keine neue KI-Suche aus; „Links neu suchen (KI)“ startet sie bewusst.
+
 Nichts aus der Recherche wird automatisch gültig. Je Versicherer fallen etwa 1–2 Minuten und einige Websuchen auf dem Anthropic-Konto an.
 
 Voraussetzung ist ein gepflegter Katalog. Tarifmerkmale, Beitragsstaffeln und Rentenfaktor-Tabellen werden je Tarifgeneration unter **Tarifkatalog & Bibliothek → Generation** erfasst. Die KI kann sie aus dem Bedingungswerk vorschlagen; der Berater bestätigt jeden Wert mit Fundstelle. Tarife mit unvollständigen Kostenfaktoren erscheinen als „nicht berechenbar“. Fondskosten hängen meist von der Fondsauswahl ab; fehlt ein Tarifwert, kann eine einheitliche Annahme gesetzt werden. Sie wird als Annahme ausgewiesen.

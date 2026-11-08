@@ -147,3 +147,5 @@ Worker-Threads und dynamisch geladene Module erkennt das Tracing nicht.
 **Ein Versicherer je Serveraufruf** (Vercel-Limit 300 s). Die Recherche über alle Versicherer läuft im Browser nacheinander und lässt sich anhalten.
 
 **Kein Marktvergleich:** Die Recherche findet nur, was die Versicherer öffentlich bereitstellen. Nicht öffentliche Tarifdetails (z. B. Maklertarife, Kostenstaffeln nur auf Anfrage) bleiben Aufgabe der Anforderung beim Versicherer.
+
+**2026-11-08 · Zugangssperren der Versicherer werden respektiert.** Das Allianz-Dokumentenportal (Cloudflare-Bot-Schutz) beantwortet automatisierte Serverabrufe mit HTTP 403. Klarwert umgeht solche Sperren nicht: weder über einen anderen Abrufdienst noch durch Vortäuschen eines Browsers. Stattdessen ermittelt Klarwert die Links, der Berater öffnet sie im Browser und lädt die PDFs hoch (Zuordnung zum Vorschlag). Bei einem gesperrten Host bricht Klarwert weitere Versuche ab.

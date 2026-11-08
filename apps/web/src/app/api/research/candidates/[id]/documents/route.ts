@@ -1,6 +1,7 @@
 import { downloadPdf, findTariffDocuments, modelConfigFromEnv } from "@klarwert/extraction";
-import { NextResponse } from "next/server";
+import { NextResponse, type NextRequest } from "next/server";
 import { teamMemberOrNull } from "@/lib/auth";
+import { isBlocked, prioritizeDocuments } from "@/lib/document-priority";
 import { env } from "@/lib/env";
 import { storeLibraryPdf } from "@/lib/library";
 
@@ -20,16 +21,26 @@ interface CandidateRow {
   insurer: { name: string };
 }
 
-const MAX_DOWNLOADS = 6;
+function hostOf(u: string): string {
+  try {
+    return new URL(u).hostname;
+  } catch {
+    return "?";
+  }
+}
 
 /**
- * Dokumente eines Tarifkandidaten beschaffen: zuerst die Links aus der Recherche, sonst Produktseite öffnen
- * (web_fetch) bzw. gezielt suchen. PDFs werden als KANDIDATEN in der Bibliothek abgelegt.
+ * Dokumente eines Tarifkandidaten beschaffen.
+ * 1. Ohne gespeicherte Links (oder auf ausdrücklichen Wunsch `search: true`) sucht die KI Links über die Produktseite.
+ * 2. Die wichtigsten Links werden direkt geladen und als KANDIDATEN in der Bibliothek abgelegt.
+ * Sperrt der Server des Versicherers automatisierte Abrufe, wird das respektiert: keine weiteren Versuche bei diesem
+ * Host, der Berater lädt die Dokumente im Browser und lädt sie hoch.
  */
-export async function POST(_req: Request, ctx: { params: Promise<{ id: string }> }) {
+export async function POST(request: NextRequest, ctx: { params: Promise<{ id: string }> }) {
   const auth = await teamMemberOrNull();
   if (!auth) return NextResponse.json({ error: "Nicht angemeldet" }, { status: 401 });
   const { id } = await ctx.params;
+  const search = Boolean(((await request.json().catch(() => ({}))) as { search?: boolean }).search);
   const { supabase } = auth;
   const { data: c } = await supabase
     .from("tariff_candidates")
@@ -38,11 +49,33 @@ export async function POST(_req: Request, ctx: { params: Promise<{ id: string }>
     .single<CandidateRow>();
   if (!c) return NextResponse.json({ error: "Kandidat nicht gefunden" }, { status: 404 });
 
+  let links = c.documents ?? [];
+  let searched = false;
+  let remarks: string | null = null;
+  let dropped = 0;
+  if (links.length === 0 || search) {
+    if (!env.anthropicConfigured()) return NextResponse.json({ error: "ANTHROPIC_API_KEY ist nicht gesetzt." }, { status: 503 });
+    try {
+      const found = await findTariffDocuments({ insurer: c.insurer.name, tariff: c.name, tariffCode: c.code, generation: c.generation_label, productUrl: c.product_url }, modelConfigFromEnv());
+      searched = true;
+      remarks = found.remarks;
+      dropped = found.dropped.length;
+      const merged = [...links];
+      for (const d of found.documents.filter((x) => x.matchesGeneration !== "nein")) if (!merged.some((m) => m.url === d.url)) merged.push({ url: d.url, title: d.title, kind: d.kind, fromSearchResults: true });
+      links = merged;
+      await supabase.from("tariff_candidates").update({ documents: merged }).eq("id", c.id);
+    } catch (e) {
+      return NextResponse.json({ error: e instanceof Error ? e.message : "Dokumentsuche fehlgeschlagen" }, { status: 502 });
+    }
+  }
+
   const results: Array<{ url: string; title: string; status: string }> = [];
-  const tried = new Set<string>();
-  const fetchAndStore = async (t: { url: string; title: string; kind: Kind; reason?: string }) => {
-    if (tried.has(t.url) || tried.size >= MAX_DOWNLOADS) return;
-    tried.add(t.url);
+  const blockedHosts = new Set<string>();
+  for (const t of prioritizeDocuments(links, 6)) {
+    if (blockedHosts.has(hostOf(t.url))) {
+      results.push({ url: t.url, title: t.title, status: "nicht abrufbar: Server des Versicherers sperrt automatische Abrufe – bitte im Browser öffnen und hochladen" });
+      continue;
+    }
     try {
       const pdf = await downloadPdf(t.url);
       const stored = await storeLibraryPdf(supabase, {
@@ -53,38 +86,16 @@ export async function POST(_req: Request, ctx: { params: Promise<{ id: string }>
         sourceKind: "websearch",
         sourceUrl: pdf.url,
         status: "candidate",
-        searchMeta: { candidate: c.name, reason: t.reason ?? null, fetchedAt: new Date().toISOString() },
+        searchMeta: { candidate: c.name, fetchedAt: new Date().toISOString() },
       });
       await supabase.from("library_documents").update({ tariff_candidate_id: c.id, ...(c.generation_id ? { generation_id: c.generation_id } : {}) }).eq("id", stored.id).is("tariff_candidate_id", null);
       results.push({ url: pdf.url, title: t.title, status: stored.duplicateOf ? "bereits in der Bibliothek" : `abgelegt (${stored.pageCount} Seiten)` });
     } catch (e) {
-      results.push({ url: t.url, title: t.title, status: `nicht abrufbar: ${e instanceof Error ? e.message : "Fehler"}` });
+      const status = `nicht abrufbar: ${e instanceof Error ? e.message : "Fehler"}`;
+      if (isBlocked(status)) blockedHosts.add(hostOf(t.url));
+      results.push({ url: t.url, title: t.title, status });
     }
-  };
-
-  for (const t of (c.documents ?? []).slice(0, MAX_DOWNLOADS)) await fetchAndStore(t);
-  const ok = () => results.filter((r) => !r.status.startsWith("nicht")).length;
-
-  let searched = false;
-  let remarks: string | null = null;
-  let dropped: string[] = [];
-  if (ok() < 2 && env.anthropicConfigured()) {
-    try {
-      const found = await findTariffDocuments({ insurer: c.insurer.name, tariff: c.name, tariffCode: c.code, generation: c.generation_label, productUrl: c.product_url }, modelConfigFromEnv());
-      searched = true;
-      remarks = found.remarks;
-      dropped = found.dropped;
-      const links = found.documents.filter((d) => d.matchesGeneration !== "nein");
-      // gefundene Links am Kandidaten vermerken (Nachvollziehbarkeit)
-      const merged = [...(c.documents ?? [])];
-      for (const d of links) if (!merged.some((m) => m.url === d.url)) merged.push({ url: d.url, title: d.title, kind: d.kind, fromSearchResults: true });
-      await supabase.from("tariff_candidates").update({ documents: merged }).eq("id", c.id);
-      for (const d of links) await fetchAndStore({ url: d.url, title: d.title, kind: d.kind, reason: d.reason });
-    } catch (e) {
-      if (results.length === 0) return NextResponse.json({ error: e instanceof Error ? e.message : "Dokumentsuche fehlgeschlagen" }, { status: 502 });
-    }
-  } else if (ok() < 2 && results.length === 0) {
-    return NextResponse.json({ error: "Keine Dokument-Links und ANTHROPIC_API_KEY nicht gesetzt." }, { status: 503 });
   }
-  return NextResponse.json({ searched, results, stored: ok(), dropped: dropped.length, remarks });
+  const stored = results.filter((r) => !r.status.startsWith("nicht")).length;
+  return NextResponse.json({ searched, results, stored, dropped, remarks, blockedHosts: [...blockedHosts] });
 }

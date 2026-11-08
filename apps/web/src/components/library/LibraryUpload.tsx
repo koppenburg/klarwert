@@ -14,12 +14,12 @@ const KINDS = [
 ] as const;
 
 /** Bedingungswerk als PDF in die Bibliothek laden (direkt in den privaten Bucket, dann Texterfassung). */
-export function LibraryUpload({ generationId }: { generationId: string | null }) {
+export function LibraryUpload({ generationId, tariffCandidateId = null, defaultTitle = "", compact = false }: { generationId: string | null; tariffCandidateId?: string | null; defaultTitle?: string; compact?: boolean }) {
   const router = useRouter();
   const [file, setFile] = useState<File | null>(null);
   const [kind, setKind] = useState("avb");
-  const [title, setTitle] = useState("");
-  const [confirmed, setConfirmed] = useState(true);
+  const [title, setTitle] = useState(defaultTitle);
+  const [confirmed, setConfirmed] = useState(!tariffCandidateId);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<{ tone: "ok" | "bad"; text: string } | null>(null);
 
@@ -34,13 +34,13 @@ export function LibraryUpload({ generationId }: { generationId: string | null })
       const res = await fetch("/api/library/register", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ storagePath: path, generationId, kind, title: title || file.name, confirmed }),
+        body: JSON.stringify({ storagePath: path, generationId, kind, title: title || file.name, confirmed, tariffCandidateId }),
       });
       const j = (await res.json()) as { error?: string; pageCount?: number; duplicateOf?: string };
       if (!res.ok) throw new Error(j.error ?? "Fehler");
       setMsg({ tone: "ok", text: j.duplicateOf ? "Dieses Dokument liegt bereits in der Bibliothek." : `Abgelegt, ${j.pageCount} Seiten durchsuchbar.` });
       setFile(null);
-      setTitle("");
+      setTitle(defaultTitle);
       router.refresh();
     } catch (e) {
       setMsg({ tone: "bad", text: e instanceof Error ? e.message : "Upload fehlgeschlagen" });
@@ -51,7 +51,7 @@ export function LibraryUpload({ generationId }: { generationId: string | null })
 
   return (
     <div className="space-y-3">
-      <div className="grid gap-3 md:grid-cols-3">
+      <div className={compact ? "grid gap-2" : "grid gap-3 md:grid-cols-3"}>
         <Field label="PDF">
           <input type="file" accept="application/pdf,.pdf" onChange={(e) => setFile(e.target.files?.[0] ?? null)} className={inputClass} />
         </Field>

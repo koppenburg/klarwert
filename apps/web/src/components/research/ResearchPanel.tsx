@@ -4,6 +4,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useRef, useState, useTransition } from "react";
 import { acceptCandidate, rejectCandidate } from "@/app/(app)/bibliothek/recherche/actions";
+import { prioritizeDocuments } from "@/lib/document-priority";
+import { LibraryUpload } from "../library/LibraryUpload";
 import { Badge, Button, Card, inputClass, Notice, Table } from "../ui";
 
 export interface InsurerView {
@@ -46,16 +48,19 @@ async function postJson(url: string, body?: unknown): Promise<{ ok: boolean; dat
 interface FetchOutcome {
   text: string;
   failures: string[];
+  blocked?: string[];
 }
 
-async function fetchDocuments(id: string): Promise<FetchOutcome> {
-  const r = await postJson(`/api/research/candidates/${id}/documents`);
+async function fetchDocuments(id: string, search = false): Promise<FetchOutcome> {
+  const r = await postJson(`/api/research/candidates/${id}/documents`, { search });
   if (!r.ok) return { text: String(r.data.error), failures: [] };
   const results = (r.data.results as Array<{ url: string; title: string; status: string }> | undefined) ?? [];
   const stored = Number(r.data.stored ?? 0);
+  const blocked = (r.data.blockedHosts as string[] | undefined) ?? [];
   return {
-    text: `${stored} von ${results.length} Dokument(en) geladen${r.data.searched ? " (Produktseite/gezielte Suche)" : ""}${Number(r.data.dropped) ? `, ${r.data.dropped} unbelegte Link(s) verworfen` : ""}.`,
+    text: `${stored} von ${results.length} Dokument(en) automatisch geladen${r.data.searched ? " (Links über Produktseite/Suche ermittelt)" : ""}${Number(r.data.dropped) ? `, ${r.data.dropped} unbelegte Link(s) verworfen` : ""}.`,
     failures: results.filter((x) => x.status.startsWith("nicht")).map((x) => `${x.title}: ${x.status.replace(/^nicht abrufbar: /, "")}`),
+    blocked,
   };
 }
 
@@ -63,6 +68,11 @@ function Outcome({ o }: { o: FetchOutcome }) {
   return (
     <div className="mt-1 text-muted">
       <p>{o.text}</p>
+      {o.blocked && o.blocked.length > 0 && (
+        <p className="text-warn">
+          {o.blocked.join(", ")} sperrt automatische Abrufe. Bitte die Dokumente unten im Browser öffnen, speichern und hier hochladen.
+        </p>
+      )}
       {o.failures.length > 0 && (
         <details>
           <summary className="cursor-pointer text-warn">{o.failures.length} nicht geladen – Gründe</summary>
@@ -72,6 +82,32 @@ function Outcome({ o }: { o: FetchOutcome }) {
             ))}
           </ul>
         </details>
+      )}
+    </div>
+  );
+}
+
+function LinkList({ links }: { links: CandidateView["documentLinks"] }) {
+  const [all, setAll] = useState(false);
+  const top = prioritizeDocuments(links, 8);
+  const shown = all ? links : top;
+  return (
+    <div className="mt-1">
+      <p className="font-medium text-ink">Gefundene Dokumente ({links.length}):</p>
+      <ul className="space-y-0.5">
+        {shown.map((l) => (
+          <li key={l.url}>
+            <a href={l.url} target="_blank" rel="noreferrer" className="text-brand underline">
+              {l.title}
+            </a>{" "}
+            <span className="text-muted">({l.kind})</span>
+          </li>
+        ))}
+      </ul>
+      {links.length > top.length && (
+        <button type="button" className="text-xs text-brand" onClick={() => setAll(!all)}>
+          {all ? "nur wichtigste anzeigen" : `alle ${links.length} anzeigen`}
+        </button>
       )}
     </div>
   );
@@ -112,9 +148,16 @@ function CandidateRow({ c, enabled, bulkMsg }: { c: CandidateView; enabled: bool
             ))}
           </ul>
         ) : (
-          <span className="text-muted">{c.documentLinks.length ? `${c.documentLinks.length} Link(s) gefunden, noch nicht geladen` : "noch keine Dokumente – „Dokumente holen“ öffnet die Produktseite"}</span>
+          <span className="text-muted">{c.documentLinks.length ? "noch nicht in der Bibliothek" : "noch keine Dokumente – „Dokumente holen“ ermittelt die Links über die Produktseite"}</span>
         )}
+        {c.documentLinks.length > 0 && <LinkList links={c.documentLinks} />}
         {(msg ?? bulkMsg) && <Outcome o={(msg ?? bulkMsg) as FetchOutcome} />}
+        <details className="mt-2">
+          <summary className="cursor-pointer text-brand">PDF aus dem Browser hochladen</summary>
+          <div className="mt-2">
+            <LibraryUpload generationId={c.generationId} tariffCandidateId={c.id} defaultTitle={c.name} compact />
+          </div>
+        </details>
         {error && <p className="mt-1 text-bad">{error}</p>}
       </td>
       <td className="w-64">
@@ -132,6 +175,21 @@ function CandidateRow({ c, enabled, bulkMsg }: { c: CandidateView; enabled: bool
           >
             {busy ? "lädt …" : "Dokumente holen"}
           </Button>
+          {c.documentLinks.length > 0 && (
+            <button
+              type="button"
+              disabled={busy || !enabled}
+              className="block text-xs text-brand underline disabled:opacity-50"
+              onClick={async () => {
+                setBusy(true);
+                setMsg(await fetchDocuments(c.id, true));
+                setBusy(false);
+                router.refresh();
+              }}
+            >
+              Links neu suchen (KI)
+            </button>
+          )}
           {c.status === "candidate" ? (
             <>
               <input value={label} onChange={(e) => setLabel(e.target.value)} className={inputClass} placeholder="Generation/Stand, z. B. 01.2026" />

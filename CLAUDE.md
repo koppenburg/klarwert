@@ -50,7 +50,7 @@ Pakete werden als TypeScript-Quelltext konsumiert (`exports: ./src/index.ts`) un
 
 ## Web-App (`apps/web`)
 
-- Next.js 16: `proxy.ts` statt Middleware, async `params`/`searchParams`, Server Actions für Mutationen, Route Handler für lange Läufe (OCR, KI, PDF; `maxDuration` bis 300 s).
+- Next.js 16: `src/proxy.ts` statt Middleware (muss neben `src/app` liegen), async `params`/`searchParams`, Server Actions für Mutationen, Route Handler für lange Läufe (OCR, KI, PDF; `maxDuration` bis 300 s).
 - Große Dateien lädt der Browser **direkt** in Supabase Storage, wegen des Body-Limits von 4,5 MB auf Vercel. Danach stößt er die Verarbeitung über eine API-Route an.
 - Schwere Node-Pakete (`tesseract.js`, `sharp`, `pdfjs-dist`, `@napi-rs/canvas`, `@sparticuz/chromium`, `playwright-core`) sind `serverExternalPackages`; Sprachdaten und Worker kommen über `outputFileTracingIncludes` ins Bundle.
 - Clientseitige Berechnung: Client-Komponenten importieren nur `@klarwert/calc` und `lib/analysis-settings.ts`, nie `@klarwert/extraction` (zieht das Anthropic-SDK).

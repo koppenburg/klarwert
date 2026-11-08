@@ -171,7 +171,7 @@ Vercel stellt das TLS-Zertifikat automatisch aus, sobald der Eintrag aufgelöst 
   select id, 'Name' from auth.users where email = 'person@example.de';
   ```
 - Zugang entziehen: Zeile in `team_members` löschen oder den Benutzer in Authentication löschen.
-- Für die technische Abnahme gibt es das Konto `abnahme@klarwert.test`. Es kann nach der Abnahme gelöscht werden; die Abnahmefälle (Bezeichnung „Synthetik …“, fiktive Daten) ebenso.
+- Für einen erneuten Abnahmelauf (`pnpm e2e:acceptance`) ein eigenes Testkonto anlegen und per SQL in `team_members` eintragen. Danach Konto und Fälle („Synthetik …“) wieder löschen. Das Konto aus der Erstabnahme ist am 08.11.2026 gelöscht worden, ebenso alle Testfälle und der fiktive Katalogeintrag „Musterversicherung AG“.
 
 ## Betrieb
 

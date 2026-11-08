@@ -173,10 +173,17 @@ async function uploadDocuments(page: Page, caseId: string, c: SyntheticCase) {
     await page.locator('select:near(:text("Dokumentart"))').first().selectOption(d.role);
     await page.setInputFiles('input[type=file][multiple]', path.join(here, "../fixtures/synthetic", c.dir, d.file));
     await page.getByRole("button", { name: /hochladen und bereinigen/ }).click();
-    await page.getByText(/personenbezogene Angabe\(n\) entfernt|Fehler|fehlgeschlagen/).last().waitFor({ timeout: 280_000 });
-    const txt = await page.locator("ul.text-xs li").allTextContents();
+    // auf das Ende der Verarbeitung dieser Datei warten (Protokollzeile „… entfernt.“ oder Fehlermeldung im Upload-Bereich)
+    const uploadCard = page.locator("section").filter({ hasText: "Unterlagen hochladen" }).first();
+    let txt: string[] = [];
+    for (let i = 0; i < 300; i++) {
+      txt = await uploadCard.locator("ul.text-xs li").allTextContents();
+      if (txt.some((t) => t.startsWith(`${d.file}:`) && t.includes("entfernt."))) break;
+      const err = uploadCard.locator(".bg-red-50");
+      if (await err.count()) throw new Error(`Upload ${d.file}: ${await err.first().textContent()}`);
+      await page.waitForTimeout(1000);
+    }
     log(`${c.key}: ${txt.at(-1)}`);
-    if (txt.join(" ").match(/Fehler|fehlgeschlagen/)) throw new Error(`Upload ${d.file} fehlgeschlagen`);
   }
   await page.reload();
   await waitIdle(page);
@@ -201,6 +208,8 @@ async function confirmFields(page: Page, supabase: SupabaseClient, caseId: strin
     await page.reload();
     await waitIdle(page);
     await shot(page, `${c.key}-2-erkennung`);
+    const { count } = await supabase.from("extractions").select("id", { count: "exact", head: true }).eq("case_id", caseId);
+    if (!count) throw new Error(`${c.key}: Erkennung lieferte kein Ergebnis (siehe Screenshot ${c.key}-2-erkennung)`);
   }
   const { data: fields } = await supabase.from("case_fields").select("key,value,status").eq("case_id", caseId);
   const recognized = new Map((fields ?? []).map((f) => [f.key as string, f.value]));

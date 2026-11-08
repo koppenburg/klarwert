@@ -1,4 +1,4 @@
-import type { CostRecord, FieldRecord, Provenance } from "@klarwert/extraction";
+import type { CostRecord, CostValue, FieldRecord, Provenance } from "@klarwert/extraction";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 export interface CaseRow {
@@ -75,7 +75,7 @@ export interface CostItemRow {
   generation_id: string | null;
   case_id: string | null;
   key: string;
-  value: number | boolean | string | null;
+  value: CostValue;
   unit: string | null;
   status: "proposed" | "confirmed" | "rejected";
   source_kind: "library" | "websearch" | "manual" | "document" | "assumption";

@@ -1,9 +1,11 @@
 "use server";
 
-import { checkGate, CONTRACT_FIELDS, costFieldDef } from "@klarwert/extraction";
+import type { TierBasis } from "@klarwert/calc";
+import { checkGate, CONTRACT_FIELDS, costFieldDef, type CostValue } from "@klarwert/extraction";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { revalidatePath } from "next/cache";
 import { requireTeamMember } from "@/lib/auth";
+import { coerceCatalogValue, type ValueMode } from "@/lib/catalog-values";
 import { loadCaseBundle, toCostRecords, toFieldRecords, type CaseDocumentRow, type CaseFieldRow } from "@/lib/data";
 import { removeObjects } from "@/lib/storage";
 
@@ -218,38 +220,31 @@ export async function createCatalogEntry(caseId: string | null, formData: FormDa
 
 // Kostenfaktoren ------------------------------------------------------------------
 
-function coerceCostValue(key: string, raw: string): number | boolean | string | null {
-  const def = costFieldDef(key);
-  const v = raw.trim();
-  if (!def) throw new Error("Unbekannter Kostenschlüssel");
-  if (v === "" || v === "–") {
-    if (def.nullable) return null;
-    throw new Error(`${def.label}: Wert erforderlich (0, falls keine Kosten dieser Art)`);
-  }
-  if (def.type === "boolean") return ["ja", "true", "1", "x"].includes(v.toLowerCase());
-  if (def.type === "enum") {
-    if (!def.options?.includes(v)) throw new Error(`${def.label}: ungültige Auswahl`);
-    return v;
-  }
-  const n = Number(v.replace(",", "."));
-  if (!Number.isFinite(n)) throw new Error(`${def.label}: keine gültige Zahl`);
-  return n;
-}
-
 /**
  * Wert setzen (und bestätigen). scope "generation" = gilt für alle Verträge dieser Tarifgeneration,
  * scope "case" = vertragsindividuelle Abweichung (Override).
  */
 export async function saveCostItem(
   caseId: string,
-  input: { key: string; rawValue: string; scope: "generation" | "case"; sourceNote: string; page?: number | null; quote?: string | null; sourceDocumentId?: string | null; confirm: boolean },
+  input: {
+    key: string;
+    rawValue: string;
+    valueMode?: ValueMode;
+    tierBasis?: TierBasis;
+    scope: "generation" | "case";
+    sourceNote: string;
+    page?: number | null;
+    quote?: string | null;
+    sourceDocumentId?: string | null;
+    confirm: boolean;
+  },
 ): Promise<{ error?: string }> {
   const { supabase, user } = await requireTeamMember();
   const { data: c } = await supabase.from("cases").select("generation_id").eq("id", caseId).single<{ generation_id: string | null }>();
   if (input.scope === "generation" && !c?.generation_id) return { error: "Zuerst Tarifgeneration zuordnen." };
-  let value: number | boolean | string | null;
+  let value: CostValue;
   try {
-    value = coerceCostValue(input.key, input.rawValue);
+    value = coerceCatalogValue({ key: input.key, raw: input.rawValue, mode: input.valueMode, tierBasis: input.tierBasis });
   } catch (e) {
     return { error: e instanceof Error ? e.message : "Ungültiger Wert" };
   }

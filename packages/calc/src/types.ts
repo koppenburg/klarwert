@@ -155,6 +155,8 @@ export interface PayoutTerms {
   lumpSumCostPercent?: number;
   /** Rentengarantiezeit in Monaten */
   guaranteePeriodMonths?: number;
+  /** Rentenfaktoren je Rentenbeginnalter; gilt, wenn kein skalarer Faktor gesetzt ist und das Alter bekannt ist */
+  annuityFactorTable?: Array<{ age: number; guaranteed?: number | null; current?: number | null }>;
 }
 
 export interface CashEvent {

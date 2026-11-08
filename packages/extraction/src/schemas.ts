@@ -3,7 +3,7 @@
  * mit Konfidenz und Fundstelle (Datei, Seite/Bildbereich, Zitat).
  */
 import { z } from "zod";
-import { COST_KEYS, FREQUENCIES, LAYERS } from "./fields";
+import { COST_KEYS, FEATURE_KEYS, FREQUENCIES, LAYERS, TIERABLE_COST_KEYS } from "./fields";
 
 export const SourceRef = z.object({
   file: z.string().describe("Dateiname, wie im Eingang angegeben"),
@@ -171,3 +171,33 @@ export const SearchCandidates = z.object({
   remarks: z.string().nullable(),
 });
 export type SearchCandidates = z.infer<typeof SearchCandidates>;
+
+/** Tarifmerkmale, Beitragsstaffeln und Rentenfaktor-Tabelle aus dem Bedingungswerk (getrennter, kompakter Aufruf). */
+export const FeatureExtraction = z.object({
+  features: z.array(
+    z.object({
+      key: z.enum(FEATURE_KEYS),
+      value: z.string().describe("Zahl mit Punkt als Dezimaltrenner; ja/nein; Aufzählung als Schlüssel; Listen kommagetrennt"),
+      page: z.number().int().nullable(),
+      quote: z.string().describe("wörtliches Zitat, max. 300 Zeichen"),
+      confidence: z.number(),
+    }),
+  ),
+  tiers: z
+    .array(
+      z.object({
+        key: z.enum(TIERABLE_COST_KEYS),
+        basis: z.enum(["monthly_premium", "annual_premium", "premium_sum"]),
+        from: z.number().describe("Stufe gilt ab diesem Betrag in € (erste Stufe 0)"),
+        value: z.number().describe("Kostenwert in der Einheit des Kostenkatalogs"),
+        page: z.number().int().nullable(),
+        quote: z.string(),
+      }),
+    )
+    .describe("nur wenn das Bedingungswerk Kosten nach Beitragshöhe staffelt; jede Stufe einzeln"),
+  annuity_table: z
+    .array(z.object({ age: z.number().int(), guaranteed: z.number().nullable(), current: z.number().nullable(), page: z.number().int().nullable() }))
+    .describe("Rentenfaktoren je 10.000 € nach Rentenbeginnalter, falls tabelliert"),
+  remarks: z.array(z.string()),
+});
+export type FeatureExtraction = z.infer<typeof FeatureExtraction>;

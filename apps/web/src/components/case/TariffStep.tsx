@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { matchTariff, MATCH_SUGGEST_THRESHOLD, requestLetter, type Catalog } from "@klarwert/extraction";
 import { supabaseServer } from "@/lib/supabase/server";
 import type { CaseBundle } from "@/lib/data";
@@ -53,7 +54,10 @@ export default async function TariffStep({ bundle }: { bundle: CaseBundle }) {
         {gen && (
           <Notice tone="ok">
             Zugeordnet: {gen.tariff.insurer.name} · {gen.tariff.name}
-            {gen.tariff.code ? ` (${gen.tariff.code})` : ""} · Generation {gen.label}
+            {gen.tariff.code ? ` (${gen.tariff.code})` : ""} · Generation {gen.label} ·{" "}
+            <Link href={`/bibliothek/${gen.id}`} className="underline">
+              Tarifdetails, Merkmale und Staffeln pflegen
+            </Link>
           </Notice>
         )}
       </Card>

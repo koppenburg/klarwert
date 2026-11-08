@@ -128,7 +128,7 @@ export function defaultSwitchMonth(c: ContractState): number {
   return Math.max(c.elapsedMonths, globalMonthOf(c, DEPOT_AVAILABLE.year, DEPOT_AVAILABLE.month));
 }
 
-function depotCosts(d: DepotAssumptions, withAlpha: boolean): CostFactors {
+export function depotCosts(d: DepotAssumptions, withAlpha: boolean): CostFactors {
   return {
     alpha: withAlpha && d.alphaPercentOfPremium > 0 ? { mode: "percent_of_premiums", rate: d.alphaPercentOfPremium, distributionMonths: 12 * 100, onDynamics: true } : undefined,
     gamma: { percentOfValue: d.costPercent },

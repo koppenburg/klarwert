@@ -13,8 +13,8 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { betaZodOutputFormat } from "@anthropic-ai/sdk/helpers/beta/zod";
 import type { z } from "zod";
-import { CONTRACT_SYSTEM_PROMPT, COST_SYSTEM_PROMPT, SEARCH_SYSTEM_PROMPT, contractUserPrompt, costUserPrompt, searchUserPrompt } from "./prompts";
-import { ContractExtractionRaw, CostExtraction, normalizeContractExtraction, SearchCandidates, type ContractExtraction } from "./schemas";
+import { CONTRACT_SYSTEM_PROMPT, COST_SYSTEM_PROMPT, FEATURE_SYSTEM_PROMPT, SEARCH_SYSTEM_PROMPT, contractUserPrompt, costUserPrompt, featureUserPrompt, searchUserPrompt } from "./prompts";
+import { ContractExtractionRaw, CostExtraction, FeatureExtraction, normalizeContractExtraction, SearchCandidates, type ContractExtraction } from "./schemas";
 
 export type Effort = "low" | "medium" | "high" | "xhigh" | "max";
 
@@ -154,4 +154,23 @@ export async function searchConditions(
     }
   }
   return { candidates: parsed.candidates, searchResultUrls: [...urls], remarks: parsed.remarks, model };
+}
+
+/** Tarifmerkmale, Beitragsstaffeln und Rentenfaktor-Tabelle aus einem (unpersönlichen) Bedingungswerk. */
+export async function extractFeatures(
+  input: { pages?: Array<{ pageNumber: number; text: string }>; pdf?: Uint8Array; meta: { insurer: string; tariff: string; generation?: string | null; title: string } },
+  cfg: ModelConfig = modelConfigFromEnv(),
+): Promise<{ data: FeatureExtraction; model: string }> {
+  const content: BetaContent[] = [];
+  const hasText = (input.pages ?? []).some((p) => p.text.trim().length > 50);
+  if (hasText) {
+    for (const p of input.pages ?? []) content.push({ type: "text", text: `=== Seite ${p.pageNumber} ===\n${p.text}` });
+  } else if (input.pdf) {
+    content.push({ type: "document", source: { type: "base64", media_type: "application/pdf", data: toBase64(input.pdf) } });
+  } else {
+    throw new ExtractionError("Bedingungswerk ohne Text und ohne PDF.");
+  }
+  content.push({ type: "text", text: featureUserPrompt(input.meta) });
+  const { parsed, model } = await parseWith(cfg, FeatureExtraction, FEATURE_SYSTEM_PROMPT, content);
+  return { data: parsed, model };
 }

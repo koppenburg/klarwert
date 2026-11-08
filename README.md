@@ -46,6 +46,7 @@ Jeder Vertrag ist ein **Fall** mit interner Fallnummer (z. B. `KW-2026-0007`). D
 Bestätigte Kostenfaktoren gehören zur **Tarifgeneration**. Beim nächsten Vertrag desselben Tarifs schlägt Klarwert sie automatisch vor. Vertragsindividuelle Abweichungen, etwa die Fondsauswahl, werden als Override am Fall gespeichert.
 
 Weitere Bereiche:
+- **Tarifauswahl:** Kundenprofil erfassen, Klarwert rechnet alle Katalogtarife und das Altersvorsorgedepot unter identischen Annahmen durch (siehe unten).
 - **Vergleich:** 2–3 Verträge unter identischen Annahmen.
 - **Tarifkatalog & Bibliothek:** Aliase pflegen, Bedingungswerke ablegen, Volltextsuche.
 - **Gesetzliche Grundlagen:** alle Konstanten mit Quelle und Prüfstatus.
@@ -56,6 +57,24 @@ Weitere Bereiche:
 2. **Fälle → Neuer Fall**: Bezeichnung ohne Kundendaten. Den Kundennamen kannst du freiwillig eintragen. Er bleibt in der Datenbank und wird zusätzlich zum Schwärzen genutzt.
 3. Schritt für Schritt durch die Reiter 1–7. Die Plaketten oben rechts zeigen, ob Vertragsdaten und Kostenfaktoren vollständig bestätigt sind.
 4. Unter **Gesetzliche Grundlagen** steht, welche Werte „bitte prüfen“ sind.
+
+## Tarifauswahl
+
+Unter **Tarifauswahl** erfasst der Berater das Kundenprofil, ohne Namen:
+- **Beitrag und Laufzeit:** Vertragsbeginn, Eintrittsalter, Rentenbeginn, Beitrag, Zahlweise, Dynamik, Einmalbeitrag, Schicht.
+- **Anforderungen:** Beitragserhalt, Risikoprofil (SRI 1–7), Nachhaltigkeit (Art. 8/9 SFDR), Rentengarantiezeit, Kapitalwahlrecht, Entnahmen, Beitragspausen, Todesfallleistung.
+- **Förderung:** Zulageberechtigung, Kinder, Vorjahreseinkommen.
+
+Klarwert rechnet daraufhin jeden Tarif des Katalogs unter identischen Annahmen durch:
+- **Beitragsstaffeln** werden für den konkreten Beitrag aufgelöst, etwa geringere Abschluss- oder Verwaltungskosten ab einem Monatsbeitrag.
+- **Rentenfaktoren** gelten für das gewählte Rentenbeginnalter, aus einer Tabelle je Alter.
+- **Harte Kriterien** wie Mindestbeitrag, Eintrittsalter oder Garantie führen zu „nicht passend“, mit Begründung.
+- **Nicht erfasste Tarifmerkmale** schließen nicht aus. Sie erscheinen als „offen – bitte prüfen“.
+- **Ergebnis:** Effektivkosten p.a., Endkapital, Zulagen, Kosten gesamt sowie die garantierte und die aktuelle Rente. Sortieren lässt es sich nach Effektivkosten, Endkapital oder Rente; nichts wird als „empfohlen“ markiert.
+- **Vergleich:** Das Altersvorsorgedepot läuft mit den eingestellten Depot-Annahmen mit.
+- **Speichern und Drucken:** Auswahlen lassen sich speichern (optional mit Fall) und drucken.
+
+Voraussetzung ist ein gepflegter Katalog. Tarifmerkmale, Beitragsstaffeln und Rentenfaktor-Tabellen werden je Tarifgeneration unter **Tarifkatalog & Bibliothek → Generation** erfasst. Die KI kann sie aus dem Bedingungswerk vorschlagen; der Berater bestätigt jeden Wert mit Fundstelle. Tarife mit unvollständigen Kostenfaktoren erscheinen als „nicht berechenbar“. Fondskosten hängen meist von der Fondsauswahl ab; fehlt ein Tarifwert, kann eine einheitliche Annahme gesetzt werden. Sie wird als Annahme ausgewiesen.
 
 ## Datenschutz: welche Daten welchen Dienst erreichen
 

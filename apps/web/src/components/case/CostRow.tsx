@@ -2,12 +2,13 @@
 
 import { useState, useTransition } from "react";
 import { confirmCostItem, rejectCostItem, saveCostItem } from "@/app/(app)/faelle/[id]/actions";
-import { formatValue } from "@/lib/format";
+import { describeValue } from "@klarwert/extraction/values";
+import { initialEditorState, ValueEditor, type ValueEditorState } from "../catalog/ValueEditor";
 import { Badge, Button, inputClass } from "../ui";
 
 export interface CostItemView {
   id: string;
-  value: number | boolean | string | null;
+  value: unknown;
   status: "proposed" | "confirmed" | "rejected";
   sourceLabel: string;
   quote: string | null;
@@ -21,8 +22,9 @@ export interface CostRowProps {
   fieldKey: string;
   label: string;
   unit?: string;
-  type: "number" | "boolean" | "enum";
+  type: "number" | "boolean" | "enum" | "table";
   options?: readonly string[];
+  tierable?: boolean;
   required: boolean;
   nullable?: boolean;
   help?: string;
@@ -34,13 +36,13 @@ export interface CostRowProps {
 
 const OPTION_LABELS: Record<string, string> = { permille_of_premium_sum: "‰ der Beitragssumme", percent_of_premiums: "% je Beitrag" };
 
-function ItemCell({ item, caseId, label }: { item: CostItemView | null; caseId: string; label: string }) {
+function ItemCell({ item, caseId, label, unit }: { item: CostItemView | null; caseId: string; label: string; unit?: string }) {
   const [pending, start] = useTransition();
   if (!item) return <span className="text-xs text-muted">–</span>;
   return (
     <div className="space-y-1">
       <div className="flex flex-wrap items-center gap-2">
-        <span className="tabular font-medium">{item.value === null ? "nicht angegeben" : formatValue(typeof item.value === "string" ? (OPTION_LABELS[item.value] ?? item.value) : item.value)}</span>
+        <span className="tabular font-medium">{typeof item.value === "string" ? (OPTION_LABELS[item.value] ?? item.value) : describeValue(item.value, unit)}</span>
         {item.status === "confirmed" ? <Badge tone="ok">bestätigt</Badge> : <Badge tone="warn">Vorschlag{item.proposedBy === "model" ? " (KI)" : ""}</Badge>}
         {item.confidence !== null && item.status !== "confirmed" && <span className="text-xs text-muted">{Math.round(item.confidence * 100)} %</span>}
       </div>
@@ -64,7 +66,7 @@ function ItemCell({ item, caseId, label }: { item: CostItemView | null; caseId: 
 export function CostRow(p: CostRowProps) {
   const [editing, setEditing] = useState(false);
   const current = p.caseItem ?? p.generationItem;
-  const [value, setValue] = useState(current?.value === null || current?.value === undefined ? "" : String(current.value));
+  const [editor, setEditor] = useState<ValueEditorState>(() => initialEditorState(p.type, current?.value));
   const [scope, setScope] = useState<"generation" | "case">(p.hasGeneration ? "generation" : "case");
   const [note, setNote] = useState("");
   const [page, setPage] = useState("");
@@ -81,32 +83,15 @@ export function CostRow(p: CostRowProps) {
         {p.help && <span className="block text-xs text-muted">{p.help}</span>}
       </td>
       <td className="align-top">
-        <ItemCell item={p.generationItem} caseId={p.caseId} label="Tarifwert" />
+        <ItemCell item={p.generationItem} caseId={p.caseId} label="Tarifwert" unit={p.unit} />
       </td>
       <td className="align-top">
-        <ItemCell item={p.caseItem} caseId={p.caseId} label="Abweichung" />
+        <ItemCell item={p.caseItem} caseId={p.caseId} label="Abweichung" unit={p.unit} />
       </td>
       <td className="w-80 align-top">
         {editing ? (
           <div className="space-y-2">
-            {p.type === "enum" ? (
-              <select value={value} onChange={(e) => setValue(e.target.value)} className={inputClass}>
-                <option value="">–</option>
-                {p.options?.map((o) => (
-                  <option key={o} value={o}>
-                    {OPTION_LABELS[o] ?? o}
-                  </option>
-                ))}
-              </select>
-            ) : p.type === "boolean" ? (
-              <select value={value} onChange={(e) => setValue(e.target.value)} className={inputClass}>
-                <option value="">–</option>
-                <option value="true">ja</option>
-                <option value="false">nein</option>
-              </select>
-            ) : (
-              <input value={value} onChange={(e) => setValue(e.target.value)} className={inputClass} placeholder={p.nullable ? "leer = nicht angegeben" : "0 = keine Kosten dieser Art"} />
-            )}
+            <ValueEditor type={p.type} tierable={p.tierable} nullable={p.nullable} options={p.options} optionLabels={OPTION_LABELS} initial={current?.value} onChange={setEditor} />
             <select value={scope} onChange={(e) => setScope(e.target.value as "generation" | "case")} className={inputClass}>
               {p.hasGeneration && <option value="generation">gilt für die Tarifgeneration</option>}
               <option value="case">nur dieser Vertrag (Override)</option>
@@ -127,7 +112,7 @@ export function CostRow(p: CostRowProps) {
                 disabled={pending}
                 onClick={() =>
                   start(async () => {
-                    const r = await saveCostItem(p.caseId, { key: p.fieldKey, rawValue: value, scope, sourceNote: note, page: page ? Number(page) : null, sourceDocumentId: docId || null, confirm: true });
+                    const r = await saveCostItem(p.caseId, { key: p.fieldKey, rawValue: editor.raw, valueMode: editor.mode, tierBasis: editor.tierBasis, scope, sourceNote: note, page: page ? Number(page) : null, sourceDocumentId: docId || null, confirm: true });
                     if (r.error) setError(r.error);
                     else {
                       setError(null);
@@ -152,3 +137,4 @@ export function CostRow(p: CostRowProps) {
     </tr>
   );
 }
+

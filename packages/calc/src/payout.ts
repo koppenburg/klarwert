@@ -4,6 +4,7 @@
  * Steuern und Sozialabgaben werden nicht gerechnet.
  */
 import { monthlyRate } from "./accumulation";
+import { annuityFactorAt } from "./tiers";
 import type { PayoutTerms } from "./types";
 
 export interface AnnuityResult {
@@ -18,8 +19,15 @@ export interface AnnuityResult {
   lumpSumCosts: number;
 }
 
-export function annuityFromCapital(capital: number, terms: PayoutTerms | undefined): AnnuityResult {
-  const t = terms ?? {};
+/** `retirementAge`: nötig, wenn die Rentenfaktoren als Tabelle je Rentenbeginnalter vorliegen. */
+export function annuityFromCapital(capital: number, terms: PayoutTerms | undefined, retirementAge?: number): AnnuityResult {
+  const base = terms ?? {};
+  const table = base.annuityFactorTable ?? [];
+  const t: PayoutTerms = {
+    ...base,
+    annuityFactorGuaranteed: base.annuityFactorGuaranteed ?? (retirementAge !== undefined ? (annuityFactorAt(table, retirementAge, "guaranteed") ?? undefined) : undefined),
+    annuityFactorCurrent: base.annuityFactorCurrent ?? (retirementAge !== undefined ? (annuityFactorAt(table, retirementAge, "current") ?? undefined) : undefined),
+  };
   const costPct = (t.annuityCostPercent ?? 0) / 100;
   const included = t.annuityCostIncludedInFactor ?? true;
   const fromFactor = (factor: number | undefined): number | null => {

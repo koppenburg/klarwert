@@ -100,7 +100,7 @@ export default async function LibraryPage({ searchParams }: { searchParams: Prom
                           const cc = counts.get(g.id);
                           return (
                             <div key={g.id}>
-                              <Link href={`/bibliothek?g=${g.id}`} className={selected === g.id ? "font-semibold text-brand" : "text-brand underline-offset-2 hover:underline"}>
+                              <Link href={`/bibliothek/${g.id}`} className="text-brand underline-offset-2 hover:underline">
                                 {g.label}
                               </Link>{" "}
                               {cc && <Badge tone={cc.proposed ? "warn" : "ok"}>{cc.confirmed} bestätigt{cc.proposed ? `, ${cc.proposed} offen` : ""}</Badge>}

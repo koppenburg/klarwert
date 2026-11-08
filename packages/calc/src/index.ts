@@ -7,3 +7,5 @@ export * from "./allowances";
 export * from "./scenarios";
 export * from "./compare";
 export * from "./analysis";
+export * from "./tiers";
+export * from "./selection";

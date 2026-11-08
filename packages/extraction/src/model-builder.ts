@@ -3,8 +3,21 @@
  * Ohne vollständig bestätigte Kostenfaktoren und Pflichtfelder gibt es keine Berechnung und keinen Report.
  * Jede Zahl behält ihre Fundstelle (provenance), damit der Report sie ausweisen kann.
  */
-import type { ContractModel, ContractState, CostFactors } from "@klarwert/calc";
+import {
+  isTieredValue,
+  resolveTieredCosts,
+  tierContext,
+  type AnnuityFactorRow,
+  type ContractLayer,
+  type ContractModel,
+  type ContractState,
+  type CostFactors,
+  type DeepTiered,
+  type SelectionCandidate,
+  type TieredValue,
+} from "@klarwert/calc";
 import { CONTRACT_FIELDS, COST_FIELDS, costFieldDef } from "./fields";
+import { featuresFromValues, isAnnuityTable } from "./values";
 
 export type SourceKind = "document" | "library" | "websearch" | "manual" | "assumption" | "legal";
 
@@ -22,9 +35,12 @@ export interface FieldRecord {
   source: Provenance | null;
 }
 
+/** gespeicherter Kosten- oder Merkmalswert: Zahl, Wahrheitswert, Auswahl, Liste, Beitragsstaffel oder Rentenfaktor-Tabelle */
+export type CostValue = number | boolean | string | null | number[] | TieredValue | AnnuityFactorRow[];
+
 export interface CostRecord {
   key: string;
-  value: number | boolean | string | null;
+  value: CostValue;
   status: "proposed" | "confirmed" | "rejected";
   /** "generation" = bestätigter Tarifwert, "case" = vertragsindividueller Override */
   scope: "generation" | "case";
@@ -96,6 +112,12 @@ function num(v: unknown): number | undefined {
   return Number.isFinite(n) ? n : undefined;
 }
 
+/** Zahl oder Beitragsstaffel */
+function numOrTier(v: unknown): number | TieredValue | undefined {
+  if (isTieredValue(v)) return v;
+  return num(v);
+}
+
 function bool(v: unknown): boolean | undefined {
   if (v === true || v === "true") return true;
   if (v === false || v === "false") return false;
@@ -116,11 +138,14 @@ export function monthsBetween(from: string, to: string): number {
   return (b.y - a.y) * 12 + (b.m - a.m);
 }
 
-/** Kostenfaktoren aus Schlüssel-Wert-Paaren (bestätigt) zusammensetzen. */
-export function buildCostFactors(values: Map<string, unknown>): CostFactors {
+/**
+ * Kostenfaktoren aus Schlüssel-Wert-Paaren (bestätigt) zusammensetzen. Staffelbare Werte können Beitragsstaffeln
+ * sein; sie werden mit `resolveTieredCosts` für den konkreten Beitrag aufgelöst.
+ */
+export function buildCostFactors(values: Map<string, unknown>): DeepTiered<CostFactors> {
   const g = (k: string) => values.get(k);
-  const costs: CostFactors = {};
-  const alphaRate = num(g("alpha.rate"));
+  const costs: DeepTiered<CostFactors> = {};
+  const alphaRate = numOrTier(g("alpha.rate"));
   if (alphaRate !== undefined) {
     costs.alpha = {
       mode: g("alpha.mode") === "percent_of_premiums" ? "percent_of_premiums" : "permille_of_premium_sum",
@@ -128,16 +153,16 @@ export function buildCostFactors(values: Map<string, unknown>): CostFactors {
       distributionMonths: num(g("alpha.distributionMonths")),
       premiumSumBasisMonths: num(g("alpha.premiumSumBasisMonths")),
       onDynamics: bool(g("alpha.onDynamics")),
-      onTopUpsPercent: num(g("alpha.onTopUpsPercent")),
-      onSinglePremiumPercent: num(g("alpha.onSinglePremiumPercent")),
+      onTopUpsPercent: numOrTier(g("alpha.onTopUpsPercent")),
+      onSinglePremiumPercent: numOrTier(g("alpha.onSinglePremiumPercent")),
       onAllowancesPercent: num(g("alpha.onAllowancesPercent")),
     };
   }
-  const beta = num(g("beta.percentOfPremium"));
+  const beta = numOrTier(g("beta.percentOfPremium"));
   if (beta !== undefined) costs.beta = { percentOfPremium: beta, onTopUpsPercent: num(g("beta.onTopUpsPercent")), onAllowancesPercent: num(g("beta.onAllowancesPercent")) };
-  const gamma = num(g("gamma.percentOfValue"));
+  const gamma = numOrTier(g("gamma.percentOfValue"));
   if (gamma !== undefined) costs.gamma = { percentOfValue: gamma, percentOfValuePaidUp: num(g("gamma.percentOfValuePaidUp")) };
-  const kappa = num(g("kappa.eurPerYear"));
+  const kappa = numOrTier(g("kappa.eurPerYear"));
   if (kappa !== undefined) costs.kappa = { eurPerYear: kappa, eurPerYearPaidUp: num(g("kappa.eurPerYearPaidUp")) };
   const ter = num(g("fund.terPercent"));
   if (ter !== undefined) costs.fund = { terPercent: ter, kickbackPercent: num(g("fund.kickbackPercent")) };
@@ -154,6 +179,7 @@ export function buildCostFactors(values: Map<string, unknown>): CostFactors {
     annuityCostIncludedInFactor: bool(g("payout.annuityCostIncludedInFactor")),
     lumpSumCostPercent: num(g("payout.lumpSumCostPercent")),
     guaranteePeriodMonths: num(g("payout.guaranteePeriodMonths")),
+    annuityFactorTable: isAnnuityTable(g("payout.annuityFactorTable")) ? (g("payout.annuityFactorTable") as AnnuityFactorRow[]) : undefined,
   };
   return costs;
 }
@@ -188,8 +214,11 @@ export function buildModel(fields: FieldRecord[], costs: CostRecord[], opts: { l
     ? (f.get("top_ups") as Array<{ date: string; amount: number }>).map((t) => ({ month: monthsBetween(start, t.date), amount: Number(t.amount) }))
     : undefined;
   const frequency = String(f.get("payment_frequency")) as ContractModel["contributions"]["frequency"];
-  const costFactors = buildCostFactors(new Map([...eff.entries()].map(([k, r]) => [k, r.value])));
-  // Fondskosten aus der Fondsauswahl, falls kein Tarif-/Overridewert: nicht stillschweigend – Gate verlangt fund.terPercent
+  const tieredCosts = buildCostFactors(new Map([...eff.entries()].map(([k, r]) => [k, r.value])));
+  const amount = frequency === "none" ? 0 : (num(f.get("contribution_amount")) ?? 0);
+  const paymentMonths = typeof paymentEnd === "string" && paymentEnd ? monthsBetween(start, paymentEnd) : undefined;
+  // Beitragsstaffeln für den vertraglichen Beitrag auflösen
+  const costFactors = resolveTieredCosts<CostFactors>(tieredCosts, tierContext({ amount, frequency, paymentMonths }, termMonths));
   const pibCosts = num(f.get("pib_effective_costs_pp"));
   const pibReturn = num(f.get("pib_return_percent"));
   const model: ContractModel = {
@@ -199,9 +228,9 @@ export function buildModel(fields: FieldRecord[], costs: CostRecord[], opts: { l
     startMonth: startD.m,
     termMonths,
     contributions: {
-      amount: frequency === "none" ? 0 : (num(f.get("contribution_amount")) ?? 0),
+      amount,
       frequency,
-      paymentMonths: typeof paymentEnd === "string" && paymentEnd ? monthsBetween(start, paymentEnd) : undefined,
+      paymentMonths,
       singlePremium: num(f.get("single_premium")),
       dynamics: num(f.get("dynamics_percent")) ? { ratePercent: num(f.get("dynamics_percent")) as number } : undefined,
       topUps,
@@ -234,4 +263,34 @@ export function buildModel(fields: FieldRecord[], costs: CostRecord[], opts: { l
   for (const x of fields) provenance[`field:${x.key}`] = x.source;
   for (const [k, r] of eff) provenance[`cost:${k}`] = r.source;
   return { model, state, provenance, warnings };
+}
+
+/**
+ * Selektionskandidat aus den Einträgen einer Tarifgeneration. Nur BESTÄTIGTE Werte zählen; fehlende
+ * Pflicht-Kostenwerte machen den Tarif „nicht berechenbar“. Fondskosten dürfen per Annahme ergänzt werden,
+ * weil sie meist von der individuellen Fondsauswahl abhängen.
+ */
+export function buildSelectionCandidate(
+  meta: { id: string; label: string; layer: ContractLayer },
+  generationRecords: Array<Pick<CostRecord, "key" | "value" | "status">>,
+  opts: { fallbackFundTerPercent?: number | null } = {},
+): SelectionCandidate & { usedFundFallback: boolean } {
+  const confirmed = new Map(generationRecords.filter((r) => r.status === "confirmed").map((r) => [r.key, r.value]));
+  let usedFundFallback = false;
+  if (!confirmed.has("fund.terPercent") && opts.fallbackFundTerPercent !== undefined && opts.fallbackFundTerPercent !== null) {
+    confirmed.set("fund.terPercent", opts.fallbackFundTerPercent);
+    usedFundFallback = true;
+  }
+  const missingCosts: string[] = [];
+  for (const def of COST_FIELDS.filter((d) => d.required)) {
+    if (!confirmed.has(def.key) || (confirmed.get(def.key) === null && !def.nullable)) missingCosts.push(def.label);
+  }
+  return {
+    ...meta,
+    kind: "tariff",
+    features: featuresFromValues(confirmed),
+    costs: buildCostFactors(confirmed),
+    missingCosts,
+    usedFundFallback,
+  };
 }

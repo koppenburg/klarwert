@@ -5,6 +5,7 @@ import { branding } from "@/lib/branding";
 
 const NAV = [
   { href: "/", label: "Fälle" },
+  { href: "/tarifauswahl", label: "Tarifauswahl" },
   { href: "/vergleich", label: "Vergleich" },
   { href: "/bibliothek", label: "Tarifkatalog & Bibliothek" },
   { href: "/grundlagen", label: "Gesetzliche Grundlagen" },

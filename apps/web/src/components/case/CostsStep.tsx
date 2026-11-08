@@ -74,6 +74,7 @@ export default function CostsStep({ bundle }: { bundle: CaseBundle }) {
                 unit={def.unit}
                 type={def.type}
                 options={def.options}
+                tierable={def.tierable}
                 required={def.required}
                 nullable={def.nullable}
                 help={def.help}

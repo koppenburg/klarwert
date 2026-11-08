@@ -94,7 +94,7 @@ export function analyzeContract(model: ContractModel, a: AnalysisAssumptions = {
     const input: SimulationInput = { termMonths: model.termMonths, contributions: model.contributions, costs: model.costs, grossReturnPercent: r, allowances };
     const simulation = simulate(input);
     const ec = effectiveCosts(input);
-    const annuity = annuityFromCapital(simulation.finalValueNet, model.costs.payout);
+    const annuity = annuityFromCapital(simulation.finalValueNet, model.costs.payout, a.retirementAge);
     const monthly = annuity.monthlyCurrent ?? annuity.monthlyGuaranteed;
     const payoutComparison =
       monthly !== null && a.retirementAge !== undefined && a.lifeExpectancyAge !== undefined

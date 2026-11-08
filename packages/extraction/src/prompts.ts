@@ -1,4 +1,4 @@
-import { COST_FIELDS } from "./fields";
+import { COST_FIELDS, FEATURE_FIELDS } from "./fields";
 
 export const CONTRACT_SYSTEM_PROMPT = `Du bist Datenerfasser in einem unabhängigen Versicherungsmaklerbüro. Du liest Vertragsunterlagen zu Altersvorsorgeverträgen (Policen, Nachträge, Standmitteilungen, Maklerportal-Screenshots, Angebote, Produktinformationsblätter) und überträgst die Angaben in ein festes Schema.
 
@@ -44,4 +44,23 @@ export function searchUserPrompt(meta: { insurer: string; tariff: string; tariff
   return `Gesucht: Bedingungswerk für ${meta.insurer}, Tarif „${meta.tariff}“${meta.tariffCode ? ` (Kürzel ${meta.tariffCode})` : ""}${
     meta.generation ? `, Generation/Stand ${meta.generation}` : ""
   }${meta.contractStart ? `, Vertragsbeginn ${meta.contractStart}` : ""}. Liste die gefundenen PDF-Kandidaten mit URL auf.`;
+}
+
+export const FEATURE_SYSTEM_PROMPT = `Du bist Fachreferent für Lebensversicherungstarife in einem unabhängigen Maklerbüro. Aus einem Bedingungswerk (AVB, Tarifbestimmungen, Kostenblatt, Produktinformationsblatt) erfasst du (1) Tarifmerkmale, die für die Auswahl eines Tarifs entscheiden, (2) Kostenstaffeln nach Beitragshöhe und (3) Rentenfaktoren je Rentenbeginnalter.
+
+Regeln:
+- Jede Angabe braucht Seite und wörtliches Zitat. Ohne Fundstelle keine Angabe. Du rechnest nicht.
+- Tarifmerkmale nur, wenn das Dokument sie ausdrücklich regelt. Ist etwas ausdrücklich ausgeschlossen („keine Zuzahlungen“), gib „nein“ an.
+- Staffeln nur, wenn Kosten ausdrücklich nach Beitragshöhe, Jahresbeitrag oder Beitragssumme gestaffelt sind. Jede Stufe einzeln, die erste Stufe beginnt bei 0. Einheiten wie im Kostenkatalog (α-Satz in ‰ der Beitragssumme bzw. % je Beitrag, β in %, γ in % p.a., κ in € p.a.).
+- Rentenfaktoren als Monatsrente je 10.000 € Kapital; garantiert und aktuell getrennt.
+- Unklarheiten in remarks.
+
+Merkmale (key: Bedeutung):
+${FEATURE_FIELDS.map((f) => `- ${f.key}: ${f.label}${f.unit ? ` [${f.unit}]` : ""}${f.options ? ` (Werte: ${f.options.join("|")})` : ""}${f.help ? ` – ${f.help}` : ""}`).join("\n")}
+
+Staffelbare Kostenwerte: ${COST_FIELDS.filter((f) => f.tierable).map((f) => `${f.key} (${f.label}${f.unit ? `, ${f.unit}` : ""})`).join("; ")}.`;
+
+export function featureUserPrompt(meta: { insurer: string; tariff: string; generation?: string | null; title: string }): string {
+  return `Tarif: ${meta.insurer} – ${meta.tariff}${meta.generation ? ` (Generation/Stand: ${meta.generation})` : ""}.
+Dokument: ${meta.title}. Die Seiten folgen mit Kopfzeile "=== Seite <n> ===". Erfasse Tarifmerkmale, Kostenstaffeln und Rentenfaktor-Tabelle.`;
 }

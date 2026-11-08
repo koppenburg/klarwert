@@ -115,3 +115,25 @@ Worker-Threads und dynamisch geladene Module erkennt das Tracing nicht.
 
 **2026-11-08 · Diagnose-Route `/api/diagnose` bleibt bestehen** (nur Teammitglieder, keine Kundendaten).
 `?ocr=1` führt einen OCR-Probelauf mit synthetischem Bild aus. Sie hilft, wenn nach einem Update von Next.js oder Vercel Pakete im Bundle fehlen.
+
+## Tarifauswahl (2026-11-08)
+
+**Darstellung (Entscheidung Auftraggeber):** Die Ergebnisliste ist sortierbar, standardmäßig nach Effektivkosten aufsteigend. Kein Tarif wird als „empfohlen“ markiert. Tarife, die harte Kriterien verfehlen, stehen getrennt und mit Begründung.
+
+**Beitragsstaffeln und Rentenfaktor-Tabellen (Entscheidung Auftraggeber):**
+- Staffelbare Kostenwerte (α-Satz, α auf Zuzahlung/Einmalbeitrag, β, γ, κ) dürfen Stufen nach Monatsbeitrag, Jahresbeitrag oder Beitragssumme haben.
+- Rentenfaktoren dürfen als Tabelle je Rentenbeginnalter vorliegen. Zwischen tabellierten Altern wird linear interpoliert, außerhalb der Tabelle nicht extrapoliert.
+- Aufgelöst wird vor der Simulation (`resolveTieredCosts`), damit der Rechenkern unverändert bleibt.
+
+**Tarifmerkmale als `cost_items` mit Schlüssel `feature.*`:**
+- Das nutzt dieselbe Mechanik für Vorschlag, Bestätigung und Fundstelle wie bei den Kostenwerten.
+- Merkmale fließen nicht in das Gate der Fallanalyse ein.
+- Ein nicht erfasstes Merkmal schließt einen Tarif in der Selektion nicht aus, sondern erscheint als offener Punkt.
+
+**Neue Riester-Abschlüsse:** Tarife nach altem Recht sind ab einem Vertragsbeginn nach dem 31.12.2026 nicht mehr wählbar (`riesterOld.lastNewContractDate`). Produkte nach neuem Recht sind erst ab dem 01.01.2027 wählbar.
+
+**Bruttorendite je Risikoklasse:** Standard 1/2/3/4,5/5,5/6,5/7 % für SRI 1–7. Das ist eine Annahme, im Fragebogen überschreibbar und für alle Kandidaten gleich.
+
+**Änderungen an Tarifwerten einer Generation** setzen die Kostenbestätigung aller Fälle dieser Generation zurück, damit kein Report auf veralteten Werten beruht. Tarifmerkmale sind davon ausgenommen.
+
+**Gespeicherte Auswahlen** (`selections`) enthalten das Profil ohne Namen und eine Ergebniszusammenfassung; optional sind sie einem Fall zugeordnet.

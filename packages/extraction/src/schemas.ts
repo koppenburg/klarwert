@@ -58,7 +58,7 @@ export const ContractExtractionRaw = z.object({
     .array(
       z.object({
         key: z.enum(CONTRACT_SCALAR_KEYS),
-        value: z.string().describe("Wert als Text. Zahlen mit Punkt als Dezimaltrenner, ohne Tausendertrennzeichen und ohne Einheit (1234.56). Datum YYYY-MM-DD. Aufzählungen als Schlüssel."),
+        value: z.string().describe("Wert als Text. Zahlen mit Punkt als Dezimaltrenner, ohne Tausendertrennzeichen und ohne Einheit (1234.56). Datum YYYY-MM-DD. Aufzählungen nur als Schlüssel: layer = riester|basis|layer3|bav; payment_frequency = monthly|quarterly|semiannual|annual|none; product_type = fonds|klassisch|hybrid|index|sonstige."),
         confidence: z.number().describe("0 bis 1"),
         file: z.string().describe("Dateiname"),
         page: z.number().int().nullable(),

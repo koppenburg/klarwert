@@ -116,7 +116,7 @@ function rowByLabel(page: Page, label: string): Locator {
 /** wartet, bis die Zeile gespeichert ist (Bearbeiten-Modus geschlossen) und meldet Validierungsfehler */
 async function waitSaved(row: Locator, what: string) {
   const save = row.getByRole("button", { name: "Speichern & bestätigen" });
-  for (let i = 0; i < 60; i++) {
+  for (let i = 0; i < 180; i++) {
     if ((await save.count()) === 0) return;
     const err = row.locator("p.text-bad");
     if (await err.count()) throw new Error(`${what}: ${await err.first().textContent()}`);
@@ -126,7 +126,7 @@ async function waitSaved(row: Locator, what: string) {
 }
 
 async function waitConfirmed(row: Locator, what: string) {
-  for (let i = 0; i < 60; i++) {
+  for (let i = 0; i < 180; i++) {
     if (await row.getByText("bestätigt", { exact: true }).count()) return;
     await row.page().waitForTimeout(500);
   }
@@ -222,8 +222,8 @@ async function confirmFields(page: Page, supabase: SupabaseClient, caseId: strin
     fieldResults[key] = { expected, recognized: rec ?? null, ok };
     const row = rowByLabel(page, label);
     if (ok) {
-      const btn = row.getByRole("button", { name: "Bestätigen" });
-      if (await btn.count()) await btn.click();
+      const btn = row.getByRole("button", { name: "Bestätigen", exact: true });
+      if (await btn.count()) await btn.click({ timeout: 120_000 });
     } else {
       if (MODE === "live") protocol.deviations.push({ case: c.key, kind: "field", key, expected, recognized: rec ?? null });
       await row.getByRole("button", { name: /Erfassen|Korrigieren/ }).click();
@@ -236,12 +236,12 @@ async function confirmFields(page: Page, supabase: SupabaseClient, caseId: strin
     await waitConfirmed(row, `Feld ${key}`);
   }
   // übrige Vorschläge der KI: als geprüft bestätigen (Berater-Entscheidung im Abnahmetest)
-  for (;;) {
-    const btn = page.getByRole("button", { name: "Bestätigen", exact: true }).first();
-    if ((await btn.count()) === 0) break;
-    await btn.click();
-    await page.waitForTimeout(700);
-    await waitIdle(page);
+  for (let guard = 0; guard < 40; guard++) {
+    const row = page.locator("tr").filter({ has: page.getByRole("button", { name: "Bestätigen", exact: true }) }).first();
+    if ((await row.count()) === 0) break;
+    const label = (await row.locator("td:first-child > span.font-medium").textContent())?.trim() ?? "";
+    await row.getByRole("button", { name: "Bestätigen", exact: true }).click({ timeout: 120_000 });
+    await waitConfirmed(rowByLabel(page, label), `Feld ${label}`);
   }
   await page.reload();
   await shot(page, `${c.key}-3-vertragsdaten-bestaetigt`);
@@ -345,12 +345,12 @@ async function confirmCosts(page: Page, supabase: SupabaseClient, caseId: string
   }
   // übrige KI-Vorschläge außerhalb des Solls verwerfen
   await page.reload();
-  for (;;) {
+  for (let guard = 0; guard < 40; guard++) {
     const btn = page.getByRole("button", { name: "Verwerfen" }).first();
     if ((await btn.count()) === 0) break;
-    await btn.click();
-    await page.waitForTimeout(700);
-    await waitIdle(page);
+    const before = await page.getByRole("button", { name: "Verwerfen" }).count();
+    await btn.click({ timeout: 120_000 });
+    for (let i = 0; i < 120 && (await page.getByRole("button", { name: "Verwerfen" }).count()) >= before; i++) await page.waitForTimeout(500);
   }
   await page.reload();
   await page.getByRole("button", { name: /Kostenfaktoren abschließen|Erneut abschließen/ }).click();

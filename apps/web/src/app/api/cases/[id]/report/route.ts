@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { chromium as playwright, type Browser } from "playwright-core";
+import type { Browser } from "playwright-core";
 import { buildSnapshot } from "@/components/report/snapshot";
 import { runFullAnalysis } from "@/lib/analysis";
 import { teamMemberOrNull } from "@/lib/auth";
@@ -11,6 +11,8 @@ export const maxDuration = 120;
 const LOCAL_CHROMIUM = "/opt/pw-browsers/chromium-1243/chrome-linux64/chrome";
 
 async function launchBrowser(): Promise<Browser> {
+  // dynamisch geladen, damit Ladefehler als Meldung zurückkommen statt als leerer 500er
+  const { chromium: playwright } = await import("playwright-core");
   if (process.env.VERCEL) {
     const { default: chromium } = await import("@sparticuz/chromium");
     return playwright.launch({ executablePath: await chromium.executablePath(), args: chromium.args, headless: true });

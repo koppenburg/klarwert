@@ -40,7 +40,11 @@ const nextConfig: NextConfig = {
     "/api/library/register": ocrFiles,
     "/api/library/search": ocrFiles,
     "/api/diagnose": ocrFiles,
-    "/api/cases/*/report": ["../../node_modules/.pnpm/@sparticuz+chromium@*/node_modules/@sparticuz/chromium/bin/**"],
+    // PDF-Erzeugung: playwright-core lädt Module dynamisch, Chromium-Binärdateien liegen in bin/
+    "/api/cases/*/report": [
+      "../../node_modules/.pnpm/@sparticuz+chromium@*/node_modules/**/*",
+      "../../node_modules/.pnpm/playwright-core@*/node_modules/playwright-core/**/*",
+    ],
   },
   experimental: {
     serverActions: { bodySizeLimit: "25mb" },

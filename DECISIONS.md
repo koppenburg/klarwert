@@ -98,3 +98,20 @@ Die gefundenen PDFs lädt der Server herunter (nur https, keine internen Adresse
 
 **2026-11-03 · PIB-Wert des synthetischen Angebots (Fall 3) wird aus den dokumentierten Kostenparametern mit dem Rechenkern erzeugt (1,04 Pp. bei 3,0 %).**
 Der Fall prüft damit die Konsistenz der Kette Dokument → Erkennung → Bestätigung → Berechnung, nicht die Methodik gegen einen Versicherer. Das Abnahmeziel von höchstens 0,1 Pp. Abweichung gegenüber echten PIBs prüft der Echtfall-Plan in `tests/fixtures/real/README.md`.
+
+## Betrieb auf Vercel (Erkenntnisse aus der Live-Abnahme, 2026-11-08)
+
+**2026-11-08 · Vertragserkennung mit flachem Antwortschema** (Liste aus Feld, Wert als Text, Konfidenz, Fundstelle) statt eines verschachtelten Objekts je Feld.
+Die API lehnte das verschachtelte Schema ab („compiled grammar is too large“). Die Typumwandlung erledigt `normalizeContractExtraction` deterministisch. Unlesbare Werte werden verworfen und als Hinweis gemeldet, nicht geraten.
+
+**2026-11-08 · Koordinaten der Schwärzungen werden gespeichert** (`case_documents.sanitized_pages[].boxList`, keine PII).
+Ohne sie liest die Re-OCR vor dem Modellaufruf schwarze Balken als Zeichen und meldet Fehlalarme. Regressionstest: `tests/stored-verification.test.ts`.
+
+**2026-11-08 · Paketauflösung zur Laufzeit mit Rückfall auf den pnpm-Speicher** (`packages/privacy/src/resolve.ts`).
+Im Vercel-Bundle fehlen die Symlinks unter `apps/web/node_modules`.
+
+**2026-11-08 · `outputFileTracingIncludes` nennt die Abhängigkeiten des OCR-Workers und `playwright-core`/`@sparticuz/chromium` vollständig.**
+Worker-Threads und dynamisch geladene Module erkennt das Tracing nicht.
+
+**2026-11-08 · Diagnose-Route `/api/diagnose` bleibt bestehen** (nur Teammitglieder, keine Kundendaten).
+`?ocr=1` führt einen OCR-Probelauf mit synthetischem Bild aus. Sie hilft, wenn nach einem Update von Next.js oder Vercel Pakete im Bundle fehlen.

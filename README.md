@@ -141,6 +141,7 @@ Empfohlene Einstellungen im Supabase-Dashboard:
 - **Authentication → Sign In / Providers → Email:** „Confirm email“ eingeschaltet lassen.
 - **Authentication → Sign In / Providers:** „Allow new users to sign up“ **ausschalten**. Benutzer legt dann nur der Inhaber an (siehe unten).
 - **Authentication → URL Configuration:** Site URL `https://klarwert.koppenburg.info`.
+- **Authentication → Attack Protection:** „Leaked password protection“ einschalten (Abgleich mit HaveIBeenPwned).
 
 ### Vercel
 Das Repository ist in Vercel importiert. Einmalig einstellen:
@@ -187,6 +188,9 @@ Alle Konstanten liegen in `packages/legal-config/src/index.ts`, jeweils mit Norm
 - **Supabase:** Das Projekt `klarwert` läuft in der Organisation „Dominic“ im Pro-Plan; als zusätzliches Projekt fallen Compute-Kosten an.
 - **Vercel:** Das Hosting richtet sich nach dem Vercel-Plan des Auftraggebers.
 
+### Diagnose
+`/api/diagnose` (nur angemeldete Teammitglieder) zeigt, ob OCR- und PDF-Pakete im Vercel-Bundle liegen. `/api/diagnose?ocr=1` führt einen OCR-Probelauf mit einem synthetischen Bild aus.
+
 ### Datensicherung und Löschung
 - Supabase sichert die Datenbank täglich (Pro-Plan).
 - Originale löscht Klarwert nach der Erkennung automatisch; „Original jetzt löschen“ entfernt sie sofort.
@@ -224,6 +228,17 @@ Der Abnahme-Durchlauf (`tests/e2e/acceptance.ts`) führt die drei synthetischen 
 - Gate-Negativtest
 
 Screenshots, PDFs und ein Protokoll mit den Abweichungen zwischen Erkennung und Soll landen in `tests/output/`.
+Die KI-Kostenextraktion lässt sich gesondert prüfen: `tests/e2e/cost-extraction-check.ts` vergleicht die Vorschläge für ein Bedingungswerk mit den Soll-Kostenfaktoren (Aufruf im Dateikopf).
+
+**Ergebnis der Live-Abnahme am 08.11.2026** (Vercel, `claude-opus-5-5`):
+- Alle drei Fälle sind vollständig durchgelaufen.
+- Vertragserkennung: 37 von 37 Sollfeldern ohne Korrektur.
+- Kostenextraktion: 49 von 49 Sollwerten, jeweils mit Seite und Zitat.
+- PIB-Abgleich (Fall 3): ausgewiesen 1,04 Pp., berechnet 1,04 Pp., Abweichung 0,00 Pp.
+- PDF-Reports wurden erzeugt.
+- Der Gate-Negativtest blockiert den Report (HTTP 409).
+- Laufzeiten: Erkennung etwa 30 s je Fall, Kostenextraktion etwa 30 s je Bedingungswerk, PDF etwa 10 s.
+
 Der Ablaufplan für anonymisierte Echtfälle steht in [tests/fixtures/real/README.md](tests/fixtures/real/README.md).
 
 ## Bekannte Grenzen

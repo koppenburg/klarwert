@@ -14,7 +14,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { betaZodOutputFormat } from "@anthropic-ai/sdk/helpers/beta/zod";
 import type { z } from "zod";
 import { CONTRACT_SYSTEM_PROMPT, COST_SYSTEM_PROMPT, SEARCH_SYSTEM_PROMPT, contractUserPrompt, costUserPrompt, searchUserPrompt } from "./prompts";
-import { ContractExtraction, CostExtraction, SearchCandidates } from "./schemas";
+import { ContractExtractionRaw, CostExtraction, normalizeContractExtraction, SearchCandidates, type ContractExtraction } from "./schemas";
 
 export type Effort = "low" | "medium" | "high" | "xhigh" | "max";
 
@@ -107,8 +107,8 @@ export async function extractContract(payload: SanitizedPayload, cfg: ModelConfi
     if (p.text.trim()) content.push({ type: "text", text: p.text });
   }
   content.push({ type: "text", text: contractUserPrompt([...new Set(payload.pages.map((p) => p.fileName))]) });
-  const { parsed, model } = await parseWith(cfg, ContractExtraction, CONTRACT_SYSTEM_PROMPT, content);
-  return { data: parsed, model };
+  const { parsed, model } = await parseWith(cfg, ContractExtractionRaw, CONTRACT_SYSTEM_PROMPT, content);
+  return { data: normalizeContractExtraction(parsed), model };
 }
 
 /** Kostenklauseln aus einem (unpersönlichen) Bedingungswerk – als Seitentext oder als PDF. */

@@ -4,7 +4,8 @@ import {
   buildModel,
   checkGate,
   COST_FIELDS,
-  ContractExtraction,
+  ContractExtractionRaw,
+  normalizeContractExtraction,
   CostExtraction,
   downloadPdf,
   extractContract,
@@ -139,7 +140,7 @@ describe("Datenschutz-Sperre", () => {
 
 describe("Schemas", () => {
   it("lassen sich in das strukturierte Ausgabeformat übersetzen", () => {
-    for (const s of [ContractExtraction, CostExtraction, SearchCandidates]) expect(() => betaZodOutputFormat(s)).not.toThrow();
+    for (const s of [ContractExtractionRaw, CostExtraction, SearchCandidates]) expect(() => betaZodOutputFormat(s)).not.toThrow();
   });
 });
 
@@ -165,5 +166,31 @@ describe("Download", () => {
     await expect(downloadPdf("https://example.com/a.pdf", { fetchImpl: fake })).rejects.toThrow(/Keine PDF/);
     const ok = (async () => new Response("%PDF-1.7 test", { status: 200 })) as unknown as typeof fetch;
     expect((await downloadPdf("https://example.com/a.pdf", { fetchImpl: ok })).sizeBytes).toBe(13);
+  });
+});
+
+describe("Normalisierung der Erkennung", () => {
+  it("wandelt Textwerte typgerecht und verwirft Unlesbares", () => {
+    const n = normalizeContractExtraction({
+      document_types: ["police"],
+      fields: [
+        { key: "contribution_amount", value: "1.234,56", confidence: 0.9, file: "a.pdf", page: 1, region: null, quote: "1.234,56 €" },
+        { key: "current_value", value: "16482.35", confidence: 0.9, file: "a.pdf", page: 1, region: null, quote: null },
+        { key: "contract_start", value: "01.01.2015", confidence: 0.9, file: "a.pdf", page: 1, region: null, quote: null },
+        { key: "layer", value: "riester", confidence: 0.9, file: "a.pdf", page: 1, region: null, quote: null },
+        { key: "payment_frequency", value: "monatlich", confidence: 0.5, file: "a.pdf", page: 1, region: null, quote: null },
+      ],
+      funds: [],
+      funds_source: null,
+      top_ups: [],
+      notes: [],
+    });
+    expect(n.contribution_amount?.value).toBe(1234.56);
+    expect(n.current_value?.value).toBe(16482.35);
+    expect(n.contract_start?.value).toBe("2015-01-01");
+    expect(n.layer?.value).toBe("riester");
+    expect(n.payment_frequency).toBeUndefined();
+    expect(n.notes.join(" ")).toMatch(/payment_frequency/);
+    expect(n.contribution_amount?.source?.file).toBe("a.pdf");
   });
 });

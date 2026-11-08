@@ -11,11 +11,19 @@ export function ExtractButton({ caseId, disabled, label = "Erkennung starten" }:
   async function run() {
     setBusy(true);
     setMsg(null);
-    const res = await fetch(`/api/cases/${caseId}/extract`, { method: "POST" });
-    const j = (await res.json()) as { error?: string; fields?: number; costProposals?: number; originalsDeleted?: number; notes?: string[] };
+    let res: Response;
+    let j: { error?: string; fields?: number; costProposals?: number; originalsDeleted?: number; notes?: string[] };
+    try {
+      res = await fetch(`/api/cases/${caseId}/extract`, { method: "POST" });
+      j = res.headers.get("content-type")?.includes("json") ? await res.json() : { error: `Server antwortete mit HTTP ${res.status} (Zeitüberschreitung oder Serverfehler).` };
+    } catch (e) {
+      setBusy(false);
+      setMsg({ tone: "bad", text: `Erkennung fehlgeschlagen: ${e instanceof Error ? e.message : "Netzwerkfehler"}` });
+      return;
+    }
     setBusy(false);
     if (!res.ok) {
-      setMsg({ tone: "bad", text: j.error ?? "Erkennung fehlgeschlagen" });
+      setMsg({ tone: "bad", text: `Erkennung fehlgeschlagen: ${j.error ?? "unbekannter Fehler"}` });
       return;
     }
     setMsg({ tone: "ok", text: `${j.fields} Feld(er) erkannt, ${j.costProposals} Kostenvorschlag/-vorschläge aus den Unterlagen, ${j.originalsDeleted} Original(e) gelöscht.`, notes: j.notes });

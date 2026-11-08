@@ -13,16 +13,6 @@ export const SourceRef = z.object({
 });
 export type SourceRef = z.infer<typeof SourceRef>;
 
-function field<T extends z.ZodType>(value: T, description: string) {
-  return z
-    .object({
-      value: value.nullable(),
-      confidence: z.number().describe("0 bis 1"),
-      source: SourceRef.nullable(),
-    })
-    .describe(description);
-}
-
 export const TopUp = z.object({ date: z.string().describe("YYYY-MM-DD"), amount: z.number() });
 export const Fund = z.object({
   name: z.string(),
@@ -31,36 +21,124 @@ export const Fund = z.object({
   terPercent: z.number().nullable().describe("laufende Kosten (TER/OGC) in % p.a., falls im Dokument genannt"),
 });
 
-export const ContractExtraction = z.object({
-  document_types: z.array(z.enum(["police", "nachtrag", "standmitteilung", "screenshot", "angebot", "pib", "sonstiges"])).describe("erkannte Dokumentarten in Reihenfolge der Dateien"),
-  insurer: field(z.string(), "Versicherer (vollständiger Name)"),
-  tariff_name: field(z.string(), "Tarifname / Produktname"),
-  tariff_code: field(z.string(), "Tarifkürzel, z. B. 'FR70'"),
-  tariff_generation: field(z.string(), "Tarifgeneration bzw. Bedingungsstand, z. B. 'Stand 01.2019'"),
-  layer: field(z.enum(LAYERS), "Schicht: riester (zertifiziert, gefördert), basis (Rürup), layer3 (private RV), bav"),
-  product_type: field(z.enum(["fonds", "klassisch", "hybrid", "index", "sonstige"]), "Produktart"),
-  contract_start: field(z.string(), "Vertragsbeginn YYYY-MM-DD"),
-  retirement_start: field(z.string(), "Rentenbeginn bzw. Ablauf der Ansparphase YYYY-MM-DD"),
-  payment_end: field(z.string(), "Ende der Beitragszahlung YYYY-MM-DD, falls abweichend vom Rentenbeginn"),
-  contribution_amount: field(z.number(), "Beitrag je Zahlungsperiode in € (aktueller Beitrag)"),
-  payment_frequency: field(z.enum(FREQUENCIES), "Zahlweise"),
-  single_premium: field(z.number(), "Einmalbeitrag in €"),
-  dynamics_percent: field(z.number(), "jährliche Dynamik in %"),
-  top_ups: field(z.array(TopUp), "Zuzahlungen"),
-  funds: field(z.array(Fund), "Fondsauswahl mit Anteilen"),
-  guarantee_level_percent: field(z.number(), "Beitragserhalt / Garantieniveau in % der Beiträge"),
-  current_value: field(z.number(), "aktuelles Vertragsguthaben in €"),
-  current_value_date: field(z.string(), "Stichtag des Guthabens YYYY-MM-DD"),
-  surrender_value: field(z.number(), "Rückkaufswert in €"),
-  paid_up_from: field(z.string(), "beitragsfrei seit YYYY-MM-DD"),
-  pib_effective_costs_pp: field(z.number(), "im Produktinformationsblatt ausgewiesene Effektivkosten in Prozentpunkten"),
-  pib_return_percent: field(z.number(), "im PIB genannte Wertentwicklungsannahme vor Kosten in % p.a., die den Effektivkosten zugrunde liegt"),
-  pib_annuity_monthly: field(z.number(), "im Angebot/PIB genannte monatliche Rente in €"),
-  annuity_factor_guaranteed: field(z.number(), "garantierter Rentenfaktor (€ Monatsrente je 10.000 € Kapital)"),
-  annuity_factor_current: field(z.number(), "aktueller Rentenfaktor je 10.000 €"),
+/** Skalare Vertragsfelder, die das Modell als flache Liste liefert (kompakte Grammatik für strukturierte Ausgabe). */
+export const CONTRACT_SCALAR_KEYS = [
+  "insurer",
+  "tariff_name",
+  "tariff_code",
+  "tariff_generation",
+  "layer",
+  "product_type",
+  "contract_start",
+  "retirement_start",
+  "payment_end",
+  "contribution_amount",
+  "payment_frequency",
+  "single_premium",
+  "dynamics_percent",
+  "guarantee_level_percent",
+  "current_value",
+  "current_value_date",
+  "surrender_value",
+  "paid_up_from",
+  "pib_effective_costs_pp",
+  "pib_return_percent",
+  "pib_annuity_monthly",
+  "annuity_factor_guaranteed",
+  "annuity_factor_current",
+] as const;
+export type ContractScalarKey = (typeof CONTRACT_SCALAR_KEYS)[number];
+
+const DOC_TYPES = ["police", "nachtrag", "standmitteilung", "screenshot", "angebot", "pib", "sonstiges"] as const;
+
+/** Rohantwort des Modells (flach). */
+export const ContractExtractionRaw = z.object({
+  document_types: z.array(z.enum(DOC_TYPES)).describe("erkannte Dokumentarten in Reihenfolge der Dateien"),
+  fields: z
+    .array(
+      z.object({
+        key: z.enum(CONTRACT_SCALAR_KEYS),
+        value: z.string().describe("Wert als Text. Zahlen mit Punkt als Dezimaltrenner, ohne Tausendertrennzeichen und ohne Einheit (1234.56). Datum YYYY-MM-DD. Aufzählungen als Schlüssel."),
+        confidence: z.number().describe("0 bis 1"),
+        file: z.string().describe("Dateiname"),
+        page: z.number().int().nullable(),
+        region: z.string().nullable().describe("Bildbereich bzw. Abschnitt"),
+        quote: z.string().nullable().describe("wörtliches Zitat, max. 200 Zeichen, Platzhalter statt Personendaten"),
+      }),
+    )
+    .describe("nur Felder, die in den Dokumenten stehen; jedes Feld höchstens einmal"),
+  funds: z.array(Fund).describe("Fondsauswahl mit Anteilen, leer wenn nicht genannt"),
+  funds_source: z.object({ file: z.string(), page: z.number().int().nullable(), quote: z.string().nullable(), confidence: z.number() }).nullable(),
+  top_ups: z.array(TopUp).describe("Zuzahlungen, leer wenn keine"),
   notes: z.array(z.string()).describe("Hinweise auf Unklarheiten, Widersprüche zwischen Dokumenten, fehlende Angaben"),
 });
-export type ContractExtraction = z.infer<typeof ContractExtraction>;
+export type ContractExtractionRaw = z.infer<typeof ContractExtractionRaw>;
+
+export interface ExtractedField<T = unknown> {
+  value: T | null;
+  confidence: number;
+  source: SourceRef | null;
+}
+
+/** Normalisierte Erkennung: je Feld Wert, Konfidenz und Fundstelle. */
+export type ContractExtraction = { document_types: Array<(typeof DOC_TYPES)[number]>; notes: string[]; funds: ExtractedField<Array<z.infer<typeof Fund>>>; top_ups: ExtractedField<Array<z.infer<typeof TopUp>>> } & Record<ContractScalarKey, ExtractedField | undefined>;
+
+const NUMERIC_KEYS = new Set<ContractScalarKey>([
+  "contribution_amount",
+  "single_premium",
+  "dynamics_percent",
+  "guarantee_level_percent",
+  "current_value",
+  "surrender_value",
+  "pib_effective_costs_pp",
+  "pib_return_percent",
+  "pib_annuity_monthly",
+  "annuity_factor_guaranteed",
+  "annuity_factor_current",
+]);
+const ENUMS: Partial<Record<ContractScalarKey, readonly string[]>> = { layer: LAYERS, payment_frequency: FREQUENCIES, product_type: ["fonds", "klassisch", "hybrid", "index", "sonstige"] };
+
+/** Wandelt den Textwert eines Feldes in den Zieltyp; ungültige Werte werden verworfen (null) statt geraten. */
+export function coerceExtractedValue(key: ContractScalarKey, raw: string): unknown {
+  const v = raw.trim();
+  if (!v || /^(null|n\/a|unbekannt|-|–)$/i.test(v)) return null;
+  if (NUMERIC_KEYS.has(key)) {
+    let t = v.replace(/[^0-9,.-]/g, "");
+    if (/,\d{1,2}$/.test(t)) t = t.replace(/\./g, "").replace(",", ".");
+    else t = t.replace(/,/g, "");
+    const n = Number(t);
+    return Number.isFinite(n) ? n : null;
+  }
+  const options = ENUMS[key];
+  if (options) return options.includes(v) ? v : null;
+  if (key.endsWith("_start") || key.endsWith("_date") || key === "payment_end" || key === "paid_up_from") {
+    const iso = /^(\d{4})-(\d{2})-(\d{2})$/.exec(v);
+    if (iso) return v;
+    const de = /^(\d{1,2})\.(\d{1,2})\.(\d{4})$/.exec(v);
+    return de ? `${de[3]}-${de[2]!.padStart(2, "0")}-${de[1]!.padStart(2, "0")}` : null;
+  }
+  return v;
+}
+
+export function normalizeContractExtraction(raw: ContractExtractionRaw): ContractExtraction {
+  const out = { document_types: raw.document_types, notes: [...raw.notes] } as ContractExtraction;
+  for (const f of raw.fields) {
+    if (out[f.key]) {
+      out.notes.push(`Feld ${f.key} mehrfach geliefert – erster Wert übernommen.`);
+      continue;
+    }
+    const value = coerceExtractedValue(f.key, f.value);
+    if (value === null) {
+      if (f.value.trim()) out.notes.push(`Feld ${f.key}: Wert „${f.value.slice(0, 40)}“ nicht lesbar – bitte manuell prüfen.`);
+      continue;
+    }
+    out[f.key] = { value, confidence: f.confidence, source: { file: f.file, page: f.page, region: f.region, quote: f.quote } };
+  }
+  const fs = raw.funds_source;
+  out.funds = { value: raw.funds.length ? raw.funds : null, confidence: fs?.confidence ?? 0, source: fs ? { file: fs.file, page: fs.page, region: null, quote: fs.quote } : null };
+  out.top_ups = { value: raw.top_ups.length ? raw.top_ups : null, confidence: fs?.confidence ?? 0.8, source: null };
+  return out;
+}
 
 export const CostItemProposal = z.object({
   key: z.enum(COST_KEYS).describe("Schlüssel aus dem Kostenkatalog"),

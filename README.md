@@ -74,6 +74,13 @@ Klarwert rechnet daraufhin jeden Tarif des Katalogs unter identischen Annahmen d
 - **Vergleich:** Das Altersvorsorgedepot läuft mit den eingestellten Depot-Annahmen mit.
 - **Speichern und Drucken:** Auswahlen lassen sich speichern (optional mit Fall) und drucken.
 
+**Tarifrecherche im Web** (Tarifkatalog & Bibliothek → „Tarifrecherche im Web“) füllt den Katalog:
+1. **Tarife finden:** Je Versicherer sucht die KI auf dessen Website nach aktuellen Altersvorsorgetarifen (wählbar: gefördert, Basisrente, Schicht 3, bAV). Erfasst werden Name, Kürzel, Schicht, Produktart, Stand, Vertriebsstatus, Produktseite und Dokument-Links. Übernommen werden nur URLs, die die Websuche tatsächlich geliefert hat. Ein einzelner Versicherer lässt sich gezielt recherchieren, alle Versicherer laufen nacheinander und sind jederzeit anhaltbar.
+2. **Dokumente holen:** Bedingungen, Kosteninformationen und Basisinformations- bzw. Produktinformationsblätter werden geladen und als **Kandidaten** in der Bibliothek abgelegt. Fehlen Links, sucht die KI gezielt nach dem Bedingungswerk.
+3. **In Katalog übernehmen:** Daraus entstehen Tarif und Generation, die Dokumente werden zugeordnet. Danach folgen die bekannten Schritte auf der Generationsseite: Dokumente bestätigen, Kosten, Merkmale und Staffeln vorschlagen lassen, jeden Wert bestätigen.
+
+Nichts aus der Recherche wird automatisch gültig. Je Versicherer fallen etwa 1–2 Minuten und einige Websuchen auf dem Anthropic-Konto an.
+
 Voraussetzung ist ein gepflegter Katalog. Tarifmerkmale, Beitragsstaffeln und Rentenfaktor-Tabellen werden je Tarifgeneration unter **Tarifkatalog & Bibliothek → Generation** erfasst. Die KI kann sie aus dem Bedingungswerk vorschlagen; der Berater bestätigt jeden Wert mit Fundstelle. Tarife mit unvollständigen Kostenfaktoren erscheinen als „nicht berechenbar“. Fondskosten hängen meist von der Fondsauswahl ab; fehlt ein Tarifwert, kann eine einheitliche Annahme gesetzt werden. Sie wird als Annahme ausgewiesen.
 
 ## Datenschutz: welche Daten welchen Dienst erreichen

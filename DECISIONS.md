@@ -137,3 +137,13 @@ Worker-Threads und dynamisch geladene Module erkennt das Tracing nicht.
 **Änderungen an Tarifwerten einer Generation** setzen die Kostenbestätigung aller Fälle dieser Generation zurück, damit kein Report auf veralteten Werten beruht. Tarifmerkmale sind davon ausgenommen.
 
 **Gespeicherte Auswahlen** (`selections`) enthalten das Profil ohne Namen und eine Ergebniszusammenfassung; optional sind sie einem Fall zugeordnet.
+
+## Tarifrecherche im Web (2026-11-08)
+
+**Ablauf in drei Stufen** (Kandidat → Dokumente → Übernahme), jeweils mit Bestätigung durch den Berater. Tarifkandidaten liegen in einer eigenen Tabelle `tariff_candidates`, damit der Katalog nur übernommene Tarife enthält. Geladene Dokumente bleiben Kandidaten (`library_documents.status = candidate`, `tariff_candidate_id`), bis der Berater sie bestätigt.
+
+**Schutz gegen erfundene Links:** Produktseiten und Quellen werden nur übernommen, wenn die URL in den Ergebnissen der Websuche vorkam. Dokument-Links außerhalb der Suchergebnisse werden markiert (`fromSearchResults: false`). Ein Download findet nur über https statt, an öffentliche Hosts, mit Prüfung der PDF-Signatur.
+
+**Ein Versicherer je Serveraufruf** (Vercel-Limit 300 s). Die Recherche über alle Versicherer läuft im Browser nacheinander und lässt sich anhalten.
+
+**Kein Marktvergleich:** Die Recherche findet nur, was die Versicherer öffentlich bereitstellen. Nicht öffentliche Tarifdetails (z. B. Maklertarife, Kostenstaffeln nur auf Anfrage) bleiben Aufgabe der Anforderung beim Versicherer.

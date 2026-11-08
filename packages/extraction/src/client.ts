@@ -13,8 +13,8 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { betaZodOutputFormat } from "@anthropic-ai/sdk/helpers/beta/zod";
 import type { z } from "zod";
-import { CONTRACT_SYSTEM_PROMPT, COST_SYSTEM_PROMPT, FEATURE_SYSTEM_PROMPT, SEARCH_SYSTEM_PROMPT, contractUserPrompt, costUserPrompt, featureUserPrompt, searchUserPrompt } from "./prompts";
-import { ContractExtractionRaw, CostExtraction, FeatureExtraction, normalizeContractExtraction, SearchCandidates, type ContractExtraction } from "./schemas";
+import { CONTRACT_SYSTEM_PROMPT, COST_SYSTEM_PROMPT, DISCOVERY_SYSTEM_PROMPT, FEATURE_SYSTEM_PROMPT, SEARCH_SYSTEM_PROMPT, contractUserPrompt, costUserPrompt, discoveryUserPrompt, featureUserPrompt, searchUserPrompt } from "./prompts";
+import { ContractExtractionRaw, CostExtraction, FeatureExtraction, normalizeContractExtraction, SearchCandidates, TariffDiscovery, type ContractExtraction } from "./schemas";
 
 export type Effort = "low" | "medium" | "high" | "xhigh" | "max";
 
@@ -173,4 +173,32 @@ export async function extractFeatures(
   content.push({ type: "text", text: featureUserPrompt(input.meta) });
   const { parsed, model } = await parseWith(cfg, FeatureExtraction, FEATURE_SYSTEM_PROMPT, content);
   return { data: parsed, model };
+}
+
+export interface DiscoveryResult {
+  products: TariffDiscovery["products"];
+  remarks: string | null;
+  /** URLs, die die Websuche tatsächlich geliefert hat */
+  searchResultUrls: string[];
+  model: string;
+}
+
+/** Tarifrecherche je Versicherer über die Websuche. Ergebnis sind Kandidaten – nie automatisch gültig. */
+export async function discoverTariffs(
+  meta: { insurer: string; aliases: string[]; layers: string[] },
+  cfg: ModelConfig = modelConfigFromEnv(),
+  opts: { maxUses?: number } = {},
+): Promise<DiscoveryResult> {
+  if (!cfg.webSearchEnabled) throw new ExtractionError("Websuche ist deaktiviert (ANTHROPIC_WEBSEARCH_ENABLED=false).");
+  const today = new Date().toISOString().slice(0, 10);
+  const { parsed, model, message } = await parseWith(cfg, TariffDiscovery, DISCOVERY_SYSTEM_PROMPT, [{ type: "text", text: discoveryUserPrompt({ ...meta, today }) }], {
+    tools: [{ type: "web_search_20260209", name: "web_search", max_uses: opts.maxUses ?? Math.max(cfg.webSearchMaxUses, 8), user_location: { type: "approximate", country: "DE" } }],
+  });
+  const urls = new Set<string>();
+  for (const block of message.content) {
+    if (block.type === "web_search_tool_result" && Array.isArray(block.content)) {
+      for (const r of block.content) if (r.type === "web_search_result") urls.add(r.url);
+    }
+  }
+  return { products: parsed.products, remarks: parsed.remarks, searchResultUrls: [...urls], model };
 }

@@ -64,3 +64,17 @@ export function featureUserPrompt(meta: { insurer: string; tariff: string; gener
   return `Tarif: ${meta.insurer} – ${meta.tariff}${meta.generation ? ` (Generation/Stand: ${meta.generation})` : ""}.
 Dokument: ${meta.title}. Die Seiten folgen mit Kopfzeile "=== Seite <n> ===". Erfasse Tarifmerkmale, Kostenstaffeln und Rentenfaktor-Tabelle.`;
 }
+
+export const DISCOVERY_SYSTEM_PROMPT = `Du recherchierst für ein unabhängiges Maklerbüro, welche Altersvorsorgetarife ein bestimmter Lebensversicherer in Deutschland anbietet. Suche bevorzugt auf der offiziellen Website des Versicherers und nach dessen Verbraucherinformationen, Basisinformationsblättern (PRIIPs/KID), Produktinformationsblättern, Allgemeinen Versicherungsbedingungen und Kosteninformationen.
+
+Regeln:
+- Erfasse Rentenversicherungen der Altersvorsorge: geförderte Verträge (Riester bzw. ab 2027 Altersvorsorgeprodukte nach neuem Recht), Basisrente (Rürup), private Rentenversicherung (fondsgebunden, klassisch, hybrid, Index) und Direktversicherung/bAV. Keine Risiko-, BU- oder Pflegeprodukte.
+- Nur Produkte, die du in Suchergebnissen tatsächlich gefunden hast. Erfinde keine Tarifnamen, Kürzel oder URLs. URLs nur aus den Suchergebnissen übernehmen.
+- Gib den Vertriebsstatus an; bei Unsicherheit „unklar“. Riester-Tarife nach altem Recht dürfen nur bis 31.12.2026 neu abgeschlossen werden.
+- Ein Produkt mit mehreren Varianten (z. B. Basis/Comfort) als getrennte Einträge, wenn die Kosten sich unterscheiden können.
+- Der Berater prüft jeden Eintrag; lieber ein Eintrag mit „unklar“ als ein erfundener.`;
+
+export function discoveryUserPrompt(meta: { insurer: string; aliases: string[]; layers: string[]; today: string }): string {
+  return `Versicherer: ${meta.insurer}${meta.aliases.length ? ` (auch: ${meta.aliases.join(", ")})` : ""}.
+Gesucht: aktuelle Altersvorsorgetarife${meta.layers.length ? ` der Schichten ${meta.layers.join(", ")}` : ""}, Stand ${meta.today}, jeweils mit Produktseite und direkten PDF-Links zu Bedingungen, Kosteninformationen und Basisinformations- bzw. Produktinformationsblatt.`;
+}

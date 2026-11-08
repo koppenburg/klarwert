@@ -1,0 +1,248 @@
+"use client";
+
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useRef, useState, useTransition } from "react";
+import { acceptCandidate, rejectCandidate } from "@/app/(app)/bibliothek/recherche/actions";
+import { Badge, Button, Card, inputClass, Notice, Table } from "../ui";
+
+export interface InsurerView {
+  id: string;
+  name: string;
+  aliases: string[];
+  last_research_at: string | null;
+  last_research_remarks: string | null;
+}
+
+export interface CandidateView {
+  id: string;
+  insurerId: string;
+  name: string;
+  code: string | null;
+  layer: string | null;
+  productType: string | null;
+  generationLabel: string | null;
+  salesStatus: string | null;
+  productUrl: string | null;
+  documentLinks: Array<{ url: string; title: string; kind: string; fromSearchResults?: boolean }>;
+  reason: string | null;
+  status: "candidate" | "accepted" | "rejected";
+  generationId: string | null;
+  libraryDocs: Array<{ id: string; title: string; kind: string; status: string; sourceUrl: string | null }>;
+}
+
+const LAYER_LABELS: Record<string, string> = { riester: "gefördert", basis: "Basisrente", layer3: "Schicht 3", bav: "bAV" };
+
+async function postJson(url: string, body?: unknown): Promise<{ ok: boolean; data: Record<string, unknown> }> {
+  try {
+    const r = await fetch(url, { method: "POST", headers: { "content-type": "application/json" }, body: body ? JSON.stringify(body) : undefined });
+    const data = r.headers.get("content-type")?.includes("json") ? ((await r.json()) as Record<string, unknown>) : { error: `HTTP ${r.status} (Zeitüberschreitung oder Serverfehler)` };
+    return { ok: r.ok, data };
+  } catch (e) {
+    return { ok: false, data: { error: e instanceof Error ? e.message : "Netzwerkfehler" } };
+  }
+}
+
+function CandidateRow({ c, enabled }: { c: CandidateView; enabled: boolean }) {
+  const router = useRouter();
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<string | null>(null);
+  const [label, setLabel] = useState(c.generationLabel ?? "");
+  const [pending, start] = useTransition();
+  return (
+    <tr className="align-top">
+      <td>
+        <span className="font-medium">{c.name}</span>
+        {c.code && <span className="text-muted"> ({c.code})</span>}
+        <div className="mt-1 flex flex-wrap gap-1">
+          {c.layer && <Badge>{LAYER_LABELS[c.layer] ?? c.layer}</Badge>}
+          {c.productType && <Badge>{c.productType}</Badge>}
+          {c.salesStatus && <Badge tone={c.salesStatus === "im Vertrieb" ? "ok" : c.salesStatus === "unklar" ? "warn" : "neutral"}>{c.salesStatus}</Badge>}
+          {c.status === "accepted" && <Badge tone="brand">im Katalog</Badge>}
+        </div>
+        {c.reason && <p className="mt-1 text-xs text-muted">{c.reason}</p>}
+        {c.productUrl && (
+          <a href={c.productUrl} target="_blank" rel="noreferrer" className="mt-1 block max-w-xs truncate text-xs text-brand underline">
+            {c.productUrl}
+          </a>
+        )}
+      </td>
+      <td className="text-xs">
+        {c.libraryDocs.length > 0 ? (
+          <ul className="space-y-1">
+            {c.libraryDocs.map((d) => (
+              <li key={d.id}>
+                {d.title} <Badge tone={d.status === "confirmed" ? "ok" : "warn"}>{d.status === "confirmed" ? "bestätigt" : "Kandidat"}</Badge>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <span className="text-muted">{c.documentLinks.length ? `${c.documentLinks.length} Link(s) gefunden, noch nicht geladen` : "keine Links – gezielte Suche möglich"}</span>
+        )}
+        {msg && <p className="mt-1 text-muted">{msg}</p>}
+      </td>
+      <td className="w-64">
+        <div className="space-y-2">
+          <Button
+            variant="secondary"
+            disabled={busy || (!enabled && c.documentLinks.length === 0)}
+            onClick={async () => {
+              setBusy(true);
+              setMsg(null);
+              const r = await postJson(`/api/research/candidates/${c.id}/documents`);
+              const results = (r.data.results as Array<{ status: string }> | undefined) ?? [];
+              setMsg(r.ok ? `${results.filter((x) => !x.status.startsWith("nicht")).length} von ${results.length} Dokument(en) geladen${r.data.searched ? " (gezielte Suche)" : ""}.` : String(r.data.error));
+              setBusy(false);
+              router.refresh();
+            }}
+          >
+            {busy ? "lädt …" : "Dokumente holen"}
+          </Button>
+          {c.status === "candidate" ? (
+            <>
+              <input value={label} onChange={(e) => setLabel(e.target.value)} className={inputClass} placeholder="Generation/Stand, z. B. 01.2026" />
+              <div className="flex gap-1">
+                <Button
+                  disabled={pending}
+                  onClick={() =>
+                    start(async () => {
+                      const r = await acceptCandidate(c.id, label);
+                      if (r.error) setMsg(r.error);
+                      else router.push(`/bibliothek/${r.generationId}`);
+                    })
+                  }
+                >
+                  In Katalog übernehmen
+                </Button>
+                <Button variant="ghost" disabled={pending} onClick={() => start(() => rejectCandidate(c.id))}>
+                  Verwerfen
+                </Button>
+              </div>
+            </>
+          ) : c.generationId ? (
+            <Link href={`/bibliothek/${c.generationId}`} className="text-sm text-brand underline">
+              Tarifdetails öffnen
+            </Link>
+          ) : null}
+        </div>
+      </td>
+    </tr>
+  );
+}
+
+export function ResearchPanel({ insurers, candidates, enabled }: { insurers: InsurerView[]; candidates: CandidateView[]; enabled: boolean }) {
+  const router = useRouter();
+  const [layers, setLayers] = useState<string[]>(["riester", "basis", "layer3", "bav"]);
+  const [running, setRunning] = useState<string | null>(null);
+  const [log, setLog] = useState<string[]>([]);
+  const stop = useRef(false);
+
+  async function research(ins: InsurerView): Promise<void> {
+    setRunning(ins.id);
+    const r = await postJson(`/api/research/insurers/${ins.id}`, { layers });
+    setLog((l) => [
+      ...l,
+      r.ok ? `${ins.name}: ${r.data.found} Tarif(e) gefunden, ${r.data.created} neu, ${r.data.updated} aktualisiert${r.data.inCatalog ? `, ${r.data.inCatalog} bereits im Katalog` : ""}.` : `${ins.name}: ${String(r.data.error)}`,
+    ]);
+    setRunning(null);
+    router.refresh();
+  }
+
+  async function researchAll(onlyNew: boolean) {
+    stop.current = false;
+    for (const ins of insurers.filter((i) => !onlyNew || !i.last_research_at)) {
+      if (stop.current) break;
+      await research(ins);
+    }
+  }
+
+  const toggle = (l: string) => setLayers((x) => (x.includes(l) ? x.filter((y) => y !== l) : [...x, l]));
+
+  return (
+    <div className="space-y-5">
+      <div>
+        <Link href="/bibliothek" className="text-sm text-brand">
+          ← Tarifkatalog
+        </Link>
+        <h1 className="text-2xl font-semibold">Tarifrecherche</h1>
+        <p className="text-sm text-muted">
+          Die KI sucht je Versicherer auf dessen Website nach aktuellen Altersvorsorgetarifen und den zugehörigen Dokumenten. Alles hier sind Vorschläge mit Quelle: Tarife werden erst nach
+          „In Katalog übernehmen“ angelegt, Dokumente und Kostenwerte erst nach deiner Bestätigung verwendet.
+        </p>
+      </div>
+      {!enabled && <Notice tone="bad">ANTHROPIC_API_KEY ist nicht gesetzt – Recherche nicht verfügbar.</Notice>}
+      {insurers.length === 0 && <Notice>Noch keine Versicherer im Katalog. Unter „Tarifkatalog & Bibliothek“ die Startliste laden.</Notice>}
+      <Card title="Recherche starten">
+        <div className="flex flex-wrap items-center gap-4 text-sm">
+          <span className="font-medium">Schichten:</span>
+          {Object.entries(LAYER_LABELS).map(([k, l]) => (
+            <label key={k} className="flex items-center gap-1">
+              <input type="checkbox" checked={layers.includes(k)} onChange={() => toggle(k)} /> {l}
+            </label>
+          ))}
+        </div>
+        <div className="mt-3 flex flex-wrap gap-2">
+          <Button disabled={!enabled || running !== null} onClick={() => researchAll(true)}>
+            Alle noch nicht recherchierten Versicherer nacheinander
+          </Button>
+          <Button variant="secondary" disabled={!enabled || running !== null} onClick={() => researchAll(false)}>
+            Alle Versicherer erneut
+          </Button>
+          {running && (
+            <Button variant="danger" onClick={() => (stop.current = true)}>
+              Nach dem laufenden Versicherer anhalten
+            </Button>
+          )}
+        </div>
+        <p className="mt-2 text-xs text-muted">Je Versicherer etwa 1–2 Minuten und einige Websuchen auf dem Anthropic-Konto. Die Ergebnisse erscheinen unten, sobald ein Versicherer fertig ist.</p>
+        {log.length > 0 && (
+          <ul className="mt-3 space-y-1 text-xs">
+            {log.map((l, i) => (
+              <li key={i}>{l}</li>
+            ))}
+          </ul>
+        )}
+      </Card>
+      {insurers.map((ins) => {
+        const list = candidates.filter((c) => c.insurerId === ins.id);
+        return (
+          <Card
+            key={ins.id}
+            title={
+              <span className="flex items-center gap-2">
+                {ins.name}
+                {ins.last_research_at ? <Badge>zuletzt {new Date(ins.last_research_at).toLocaleDateString("de-DE")}</Badge> : <Badge tone="warn">noch nicht recherchiert</Badge>}
+                {list.length > 0 && <Badge tone="brand">{list.length} Tarif(e)</Badge>}
+              </span>
+            }
+            actions={
+              <Button variant="secondary" disabled={!enabled || running !== null} onClick={() => research(ins)}>
+                {running === ins.id ? "recherchiert …" : "Tarife recherchieren"}
+              </Button>
+            }
+          >
+            {ins.last_research_remarks && <p className="mb-2 text-xs text-muted">Hinweis der Recherche: {ins.last_research_remarks}</p>}
+            {list.length ? (
+              <Table>
+                <thead>
+                  <tr>
+                    <th>Tarif (Vorschlag)</th>
+                    <th>Dokumente</th>
+                    <th>Aktion</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {list.map((c) => (
+                    <CandidateRow key={c.id} c={c} enabled={enabled} />
+                  ))}
+                </tbody>
+              </Table>
+            ) : (
+              <p className="text-sm text-muted">Keine Vorschläge.</p>
+            )}
+          </Card>
+        );
+      })}
+    </div>
+  );
+}

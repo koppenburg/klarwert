@@ -70,7 +70,17 @@ export default async function LibraryPage({ searchParams }: { searchParams: Prom
           </ul>
         )}
       </Card>
-      <Card title="Tarifkatalog" actions={<SeedButton />}>
+      <Card
+        title="Tarifkatalog"
+        actions={
+          <span className="flex gap-2">
+            <Link href="/bibliothek/recherche" className="rounded-md border border-line px-3.5 py-2 text-sm hover:bg-brand-soft">
+              Tarifrecherche im Web
+            </Link>
+            <SeedButton />
+          </span>
+        }
+      >
         <Table>
           <thead>
             <tr>

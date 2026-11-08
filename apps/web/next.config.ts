@@ -40,6 +40,7 @@ const nextConfig: NextConfig = {
     "/api/library/register": ocrFiles,
     "/api/library/search": ocrFiles,
     "/api/diagnose": ocrFiles,
+    "/api/research/candidates/*/documents": ocrFiles,
     // PDF-Erzeugung: playwright-core lädt Module dynamisch, Chromium-Binärdateien liegen in bin/
     "/api/cases/*/report": [
       "../../node_modules/.pnpm/@sparticuz+chromium@*/node_modules/**/*",

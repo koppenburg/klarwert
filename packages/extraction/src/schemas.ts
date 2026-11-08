@@ -201,3 +201,30 @@ export const FeatureExtraction = z.object({
   remarks: z.array(z.string()),
 });
 export type FeatureExtraction = z.infer<typeof FeatureExtraction>;
+
+/** Tarifrecherche je Versicherer: aktuelle Altersvorsorgetarife mit Dokument-Links (nur Vorschläge). */
+export const TariffDiscovery = z.object({
+  products: z.array(
+    z.object({
+      name: z.string().describe("Produkt-/Tarifname wie vom Versicherer verwendet"),
+      code: z.string().nullable().describe("Tarifkürzel, nur wenn ausdrücklich genannt"),
+      layer: z.enum(LAYERS),
+      product_type: z.enum(["fonds", "klassisch", "hybrid", "index", "sonstige"]),
+      generation: z.string().nullable().describe("Tarifstand/Bedingungsstand, z. B. „01.2026“, nur wenn genannt"),
+      sales_status: z.enum(["im Vertrieb", "nicht mehr im Vertrieb", "unklar"]),
+      product_url: z.string().nullable().describe("Produktseite beim Versicherer, nur aus den Suchergebnissen"),
+      documents: z
+        .array(
+          z.object({
+            url: z.string(),
+            title: z.string(),
+            kind: z.enum(["avb", "tarifbestimmungen", "pib", "kostenblatt", "sonstiges"]).describe("pib auch für Basisinformationsblatt/KID"),
+          }),
+        )
+        .describe("direkte Dokument-Links (PDF) aus den Suchergebnissen"),
+      reason: z.string().describe("Quelle und Begründung in einem Satz"),
+    }),
+  ),
+  remarks: z.string().nullable(),
+});
+export type TariffDiscovery = z.infer<typeof TariffDiscovery>;

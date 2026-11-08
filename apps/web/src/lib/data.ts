@@ -43,7 +43,10 @@ export interface SanitizedPageMeta {
   imagePath?: string;
   width?: number;
   height?: number;
+  /** Anzahl der Schwärzungen */
   boxes: number;
+  /** Koordinaten der Schwärzungen (keine personenbezogenen Daten); nötig, damit die Prüfung sie als Platzhalter erkennt */
+  boxList?: Array<{ x: number; y: number; width: number; height: number }>;
   ocrConfidence?: number;
 }
 

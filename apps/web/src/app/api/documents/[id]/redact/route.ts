@@ -27,13 +27,16 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ id: st
     const result = await processDocument(auth.supabase, doc, { originalFileName: body.data.originalFileName ?? doc.file_name, customerName: c?.customer_name ?? null, manualBoxes: boxes });
     return NextResponse.json({ ...result, mode: "neu bereinigt" });
   }
-  for (const meta of doc.sanitized_pages ?? []) {
+  const pages = doc.sanitized_pages ?? [];
+  for (const meta of pages) {
     const b = boxes[meta.pageNumber];
     if (!b?.length || !meta.imagePath) continue;
     const png = await download(auth.supabase, "sanitized", meta.imagePath);
     await upload(auth.supabase, "sanitized", meta.imagePath, await applyBoxes(png, b), "image/png");
+    meta.boxList = [...(meta.boxList ?? []), ...b];
+    meta.boxes = meta.boxList.length;
   }
   const warnings = [...(doc.sanitize_warnings ?? []), "Nachschwärzung nur im Bild (Original bereits gelöscht) – der Text wurde nicht verändert."];
-  await auth.supabase.from("case_documents").update({ sanitize_warnings: warnings, sanitized_approved_at: null }).eq("id", doc.id);
+  await auth.supabase.from("case_documents").update({ sanitized_pages: pages, sanitize_warnings: warnings, sanitized_approved_at: null }).eq("id", doc.id);
   return NextResponse.json({ mode: "nur Bild", warnings });
 }

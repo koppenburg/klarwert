@@ -47,7 +47,7 @@ export async function processDocument(
       imagePath = `${prefix}/page-${p.pageNumber}.png`;
       await upload(supabase, "sanitized", imagePath, p.image, "image/png");
     }
-    pages.push({ pageNumber: p.pageNumber, source: p.source, textPath, imagePath, width: p.width, height: p.height, boxes: p.boxes.length, ocrConfidence: p.ocrConfidence });
+    pages.push({ pageNumber: p.pageNumber, source: p.source, textPath, imagePath, width: p.width, height: p.height, boxes: p.boxes.length, boxList: p.boxes, ocrConfidence: p.ocrConfidence });
   }
   const piiSummary: Record<string, number> = {};
   for (const m of sanitized.matches) piiSummary[m.kind] = (piiSummary[m.kind] ?? 0) + 1;
@@ -73,7 +73,7 @@ export async function loadSanitized(supabase: SupabaseClient, doc: CaseDocumentR
   for (const meta of doc.sanitized_pages ?? []) {
     const text = new TextDecoder().decode(await download(supabase, "sanitized", meta.textPath));
     const image = meta.imagePath ? await download(supabase, "sanitized", meta.imagePath) : undefined;
-    pages.push({ pageNumber: meta.pageNumber, text, image, width: meta.width, height: meta.height, source: meta.source, boxes: [] });
+    pages.push({ pageNumber: meta.pageNumber, text, image, width: meta.width, height: meta.height, source: meta.source, boxes: meta.boxList ?? [] });
   }
   return { fileName: doc.file_name, mimeType: doc.mime_type, pages, matches: [], warnings: doc.sanitize_warnings ?? [] };
 }
